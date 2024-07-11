@@ -305,24 +305,27 @@ class MainInputFrame(ttk.Frame):
                         self.focus_force()
                         self.formulation_fname = ""
                         self.formulation_df = None
-                self.convert_to_weight = "Volume Fraction" not in self.formulation_df.columns
-                try:
-                        if self.convert_to_weight:
-                                self.formulation_table.heading('conc', text='Weight Fraction')
-                                for index, row in self.formulation_df.iterrows():
-                                        assert type(row["Weight Fraction"]) in [int, float]
-                                        self.formulation_table.insert('', tk.END, values=(row["Name"], row["Weight Fraction"]))
-                        else:
-                                self.formulation_table.heading('conc', text='Volume Fraction')
-                                for index, row in self.formulation_df.iterrows():
-                                        assert type(row["Volume Fraction"]) in [int, float]
-                                        self.formulation_table.insert('', tk.END, values=(row["Name"], row["Volume Fraction"]))
-                except AssertionError:
-                        tk.messagebox.showwarning(title="Invalid Input", message="Formulation file has invalid data")
-                        self.focus_force()
-                        self.formulation_fname = ""
-                        self.formulation_df = None
-                        return
+                else:
+                        self.convert_to_weight = "Volume Fraction" not in self.formulation_df.columns
+                        self.formulation_table.delete(*self.formulation_table.get_children())  # Clear previous data
+
+                        try:
+                                if self.convert_to_weight:
+                                        self.formulation_table.heading('conc', text='Weight Fraction')
+                                        for index, row in self.formulation_df.iterrows():
+                                                assert type(row["Weight Fraction"]) in [int, float]
+                                                self.formulation_table.insert('', tk.END, values=(row["Name"], row["Weight Fraction"]))
+                                else:
+                                        self.formulation_table.heading('conc', text='Volume Fraction')
+                                        for index, row in self.formulation_df.iterrows():
+                                                assert type(row["Volume Fraction"]) in [int, float]
+                                                self.formulation_table.insert('', tk.END, values=(row["Name"], row["Volume Fraction"]))
+                        except AssertionError:
+                                tk.messagebox.showwarning(title="Invalid Input", message="Formulation file has invalid data")
+                                self.focus_force()
+                                self.formulation_fname = ""
+                                self.formulation_df = None
+                                return
                 self.formulation_label.configure(text=os.path.basename(fname))
                 
         def select_solvent_file(self, fname=None):
