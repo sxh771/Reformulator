@@ -1,5 +1,5 @@
 import numpy as np
-import pandas as pd
+import pandas as pde
 import itertools
 import math
 import tkinter.ttk as ttk
@@ -282,6 +282,12 @@ class MainInputFrame(ttk.Frame):
                 ttk.Button(self, text="Load Config", style='big.TButton', command=self.read_config).grid(row=17,column=0)
                 ttk.Button(self, text="Save Config", style='big.TButton', command=self.write_config).grid(row=17,column=1)
                 self.all_solvents_df = None
+
+        def show_error_message(self, message):
+                root = tk.Tk()
+                root.withdraw()  # Hide the main window
+                messagebox.showerror("Error", message)
+                root.destroy()
                 
         def select_formulation_file(self, fname=None):
                 if fname is None:
@@ -362,11 +368,26 @@ class MainInputFrame(ttk.Frame):
                 self.reform_input.solvent_label.configure(text=os.path.basename(fname))
 
         def run_evap_predictor(self):
+
+                try:
+                        volume = self.formulation_df["Weight Fraction"] / np.array(self.all_solvents_df["Density"][self.formulation_df["Name"]])
+                except KeyError as e:
+                        missing_solvents = str(e).strip("[]'")
+                        error_message = f"The following solvents are not in the database: {missing_solvents}"
+                        self.show_error_message(error_message)
+                        return  # Exit the method early      
+                  
                 """
                 Processes inputs and sends them to :func:`get_evap_curve`"
                 """
                 if "Volume Fraction" not in self.formulation_df.columns:
-                        volume = self.formulation_df["Weight Fraction"] / np.array(self.all_solvents_df["Density"][self.formulation_df["Name"]])
+                        try:
+                                volume = self.formulation_df["Weight Fraction"] / np.array(self.all_solvents_df["Density"][self.formulation_df["Name"]])
+                        except KeyError as e:
+                                missing_solvents = str(e).strip("[]'")
+                                error_message = f"The following solvents are not in the database: {missing_solvents}"
+                                self.show_error_message(error_message)
+                                return  # Exit the method early
                         self.formulation_df["Volume Fraction"] = volume / sum(volume)
                 try:
                         blend = [self.all_solvents_df.loc[name,:] for name in self.formulation_df["Name"]]
@@ -447,6 +468,20 @@ class MainInputFrame(ttk.Frame):
                 fname = tk.filedialog.askopenfilename(filetypes=[("JSON files (.json)", "*.json")])
                 with open(fname) as f:
                         self.set_config(json.load(f))
+                
+from tkinter import messagebox
+
+# # ... (rest of your imports and code)
+
+# def show_error_message(self, message):
+#         root = tk.Tk()
+#         root.withdraw()  # Hide the main window
+#         messagebox.showerror("Error", message)
+#         root.destroy()
+
+
+
+# Rest of your code continues here
                 
                 
 
