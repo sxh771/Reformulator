@@ -433,12 +433,13 @@ class MainInputFrame(ttk.Frame):
                 self.graph.canvas.draw()
 
         def write_output(self):
-                fname = tk.filedialog.asksaveasfilename(filetypes=[("Excel files (.xlsx)", "*.xlsx")])
-                if fname[-5:] != ".xlsx":
-                        fname = fname + ".xlsx"
-                write_to_excel(fname, self.formulation_df["Name"], self.t, self.total_profile,
-                               self.partial_profiles, self.RED, self.temp, "Weight Fraction" if self.convert_to_weight else "Volume Fraction")
-                os.startfile(fname)
+                fname = tk.filedialog.asksaveasfilename(defaultextension=".xlsx")
+                if fname:
+                        target_params = self.target_frame.get_params()
+                        target_params['Total Time (min)'] = float(self.total_time.get())
+
+                        write_to_excel(fname, self.formulation_df["Name"], self.t, self.total_profile,
+                        self.partial_profiles, self.RED, self.temp, target_params, caption=self.formulation_fname)
 
         def get_config(self):
                 return {"temp_frame": self.temp_frame.get_config(),

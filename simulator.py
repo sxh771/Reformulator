@@ -347,38 +347,50 @@ def group_similar_results(results, num_solvents):
                                 current_level[r["order"][-1].name] = {"result": r}
         return grouped_results
 
-def write_to_excel(fname, blend, t, total_profile, partial_profiles, RED, temperatures, caption=""):
-        """
-        Creates a new Excel sheet with "summary" and full data tabs based on the outputs of `get_evap_estimate` or `get_evap_curve` for a given `blend`
+import re
 
-        Args:
-                fname: The filename to write results to
-                blend: A list of pandas DataFrame rows containing information about the solvents in the blend
-                t: Numpy array of time points where concentrations were evaluated
-                total_profile: Numpy array of total amount of solvent remaining at each time point
-                partial_profiles: 2D Numpy array of the fraction of total remaining blend for each solvent at each time point
-                RED: Numpy array of RED at each time point
-                temperatures: A numpy array of temperatures at all time points of interest
-        """
-        if fname[-5:] != ".xlsx":
-                        fname = fname + ".xlsx"
-        with pd.ExcelWriter(fname) as writer:
-                full_data = {"Time (min)": t}
-                full_data.update({name: pp for pp, name in zip(partial_profiles, blend)})
-                full_data["Total"] = total_profile
-                full_data["RED"] = RED.flatten()
-                full_data["Temp (C)"] = temperatures
-                full_data_df = pd.DataFrame.from_dict(full_data)
-                summary_df = pd.concat([full_data_df.loc[lambda df: df['Total'] < x, :].iloc[0].drop(["Total"]+list(blend)) for x in [1, .75, .5, .25, .1]], axis=1)
-                last_data = full_data_df.iloc[-1]
-                solvent_conc = [last_data[n] for n in blend]
-                tail = blend[np.argmax(solvent_conc)]
-                tail_solvent = full_data_df.loc[lambda df: df[tail]==1].iloc[0].drop(["Total"]+list(blend))
-                if tail_solvent.shape[0] > 0:
-                        summary_df = pd.concat([summary_df, tail_solvent], axis=1).T
-                        summary_df.index = ["100% Solvent Remaining", "75% Solvent Remaining", "50% Solvent Remaining", "25% Solvent Remaining", "10% Solvent Remaining", "Only Tail Solvent Remaining"]
-                else:
-                        summary_df=summary_df.T
-                        summary_df.index = ["100% Solvent Remaining", "75% Solvent Remaining", "50% Solvent Remaining", "25% Solvent Remaining", "10% Solvent Remaining"]
-                summary_df.to_excel(writer, sheet_name="Summary")
-                full_data_df.to_excel(writer, sheet_name=f"All Data ({caption})") 
+def write_to_excel(fname, blend, t, total_profile, partial_profiles, RED, temperatures, target_params, caption=""):
+    """
+    Creates a new Excel sheet with "summary", "target", and full data tabs based on the outputs of `get_evap_estimate` or `get_evap_curve` for a given `blend`
+
+    Args:
+        fname: The filename to write results to
+        blend: A list of pandas DataFrame rows containing information about the solvents in the blend
+        t: Numpy array of time points where concentrations were evaluated
+        total_profile: Numpy array of total amount of solvent remaining at each time point
+        partial_profiles: 2D Numpy array of the fraction of total remaining blend for each solvent at each time point
+        RED: Numpy array of RED at each time point
+        temperatures: A numpy array of temperatures at all time points of interest
+        target_params: A dictionary containing information about the Hansen Solubility Parameters of the targeted resin (dD, dP, dH, R0, and solids)
+        caption: A string to be used in the "All Data" sheet name
+    """
+    if fname[-5:] != ".xlsx":
+        fname = fname + ".xlsx"
+    
+    with pd.ExcelWriter(fname) as writer:
+        full_data = {"Time (min)": t}
+        full_data.update({name: pp for pp, name in zip(partial_profiles, blend)})
+        full_data["Total"] = total_profile
+        full_data["RED"] = RED.flatten()
+        full_data["Temp (C)"] = temperatures
+        full_data_df = pd.DataFrame.from_dict(full_data)
+        summary_df = pd.concat([full_data_df.loc[lambda df: df['Total'] < x, :].iloc[0].drop(["Total"]+list(blend)) for x in [1, .75, .5, .25, .1]], axis=1)
+        last_data = full_data_df.iloc[-1]
+        solvent_conc = [last_data[n] for n in blend]
+        tail = blend[np.argmax(solvent_conc)]
+        tail_solvent = full_data_df.loc[lambda df: df[tail]==1].iloc[0].drop(["Total"]+list(blend))
+        if tail_solvent.shape[0] > 0:
+            summary_df = pd.concat([summary_df, tail_solvent], axis=1).T
+            summary_df.index = ["100% Solvent Remaining", "75% Solvent Remaining", "50% Solvent Remaining", "25% Solvent Remaining", "10% Solvent Remaining", "Only Tail Solvent Remaining"]
+        else:
+            summary_df=summary_df.T
+            summary_df.index = ["100% Solvent Remaining", "75% Solvent Remaining", "50% Solvent Remaining", "25% Solvent Remaining", "10% Solvent Remaining"]
+        summary_df.to_excel(writer, sheet_name="Summary")
+        
+        # Add initial temperature to target_params
+        target_params['Initial Temperature (C)'] = temperatures[0]
+        
+        target_df = pd.DataFrame.from_dict(target_params, orient='index', columns=['Value'])
+        target_df.to_excel(writer, sheet_name="Target")
+        
+        full_data_df.to_excel(writer, sheet_name=f"All Data")
