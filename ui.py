@@ -69,6 +69,7 @@ class TempProfileEditor(tk.Toplevel):
                 
                 
                 
+
 class TempProfileFrame(ttk.Frame):
         """
         Frame for selecting and entering temperature ramp parameters. Used on main & reformulate screens.
@@ -437,6 +438,7 @@ class MainInputFrame(ttk.Frame):
                 if fname:
                         target_params = self.target_frame.get_params()
                         target_params['Total Time (min)'] = float(self.total_time.get())
+                        target_params['Initial Temperature (C)'] = self.temp[0]
 
                         write_to_excel(fname, self.formulation_df["Name"], self.t, self.total_profile,
                         self.partial_profiles, self.RED, self.temp, target_params, caption=self.formulation_fname)
@@ -1037,7 +1039,7 @@ class GraphFrame(ttk.Frame):
         def __init__(self, root):
                 super().__init__(root)
                 self.fig = Figure(figsize=(5, 6), dpi=100)
-                self.fig.set_layout_engine("tight")
+                self.fig.set_layout_engine("constrained")
                 self.conc_ax = self.fig.add_subplot(5,1,(1,3))
                 self.conc_ax.set_xlabel("time [min]")
                 self.conc_ax.set_ylabel("wt frac")
@@ -1055,8 +1057,13 @@ class GraphFrame(ttk.Frame):
                 self.toolbar = NavigationToolbar2Tk(self.canvas, self, pack_toolbar=False)
                 self.toolbar.update()
                 self.canvas.mpl_connect("key_press_event", key_press_handler)
+                
                 self.toolbar.pack(side=tk.BOTTOM, fill=tk.X)
                 self.canvas.get_tk_widget().pack(side=tk.TOP, fill=tk.BOTH, expand=True)
+                
+                # Configure the frame to expand
+                self.columnconfigure(0, weight=1)
+                self.rowconfigure(0, weight=1)
         def clear_artists(self):
                 for artist in self.temp_ax.lines + self.temp_ax.collections:
                     artist.remove()
@@ -1072,8 +1079,8 @@ if __name__ == "__main__":
         compare_screen.wm_title("Evaporation Simulator Comparison Tool")
         compare_graph = GraphFrame(compare_screen)
         compare_input = CompareInputFrame(compare_screen, compare_graph)
-        compare_input.grid(row=0, column=0, sticky="N")
-        compare_graph.grid(row=0, column=1)
+        compare_input.grid(row=0, column=0, sticky="NSEW")
+        compare_graph.grid(row=0, column=1, sticky="NSEW")
         compare_screen.withdraw()
         compare_screen.protocol("WM_DELETE_WINDOW", compare_screen.withdraw)
         reform_screen = tk.Toplevel(root)
@@ -1087,6 +1094,13 @@ if __name__ == "__main__":
         
         graph_frame = GraphFrame(root)
         input_frame = MainInputFrame(root, graph_frame, compare_input, compare_screen, reform_input, reform_screen)
-        input_frame.grid(column=0,row=0, sticky="N")
-        graph_frame.grid(column=1,row=0)
+        
+        # Use grid with sticky option to make frames expand
+        input_frame.grid(column=0, row=0, sticky="NSEW")
+        graph_frame.grid(column=1, row=0, sticky="NSEW")
+        
+        # Configure the root window to allow expansion
+        root.columnconfigure(1, weight=1)
+        root.rowconfigure(0, weight=1)
+        
         root.mainloop()
