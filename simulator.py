@@ -6,6 +6,7 @@ import itertools
 import math
 import os
 import re
+import openpyxl
 
 STANDARD_RATE_WT = .377/.1/580
 #STANDARD_RATE_VOL = 
@@ -349,7 +350,7 @@ def group_similar_results(results, num_solvents):
 
 import re
 
-def write_to_excel(fname, blend, t, total_profile, partial_profiles, RED, temperatures, target_params, caption=""):
+def write_to_excel(fname, blend, t, total_profile, partial_profiles, RED, temperatures, target_params, temp_profile, temp_params, caption=""):
     """
     Creates a new Excel sheet with "summary", "target", and full data tabs based on the outputs of `get_evap_estimate` or `get_evap_curve` for a given `blend`
 
@@ -362,11 +363,19 @@ def write_to_excel(fname, blend, t, total_profile, partial_profiles, RED, temper
         RED: Numpy array of RED at each time point
         temperatures: A numpy array of temperatures at all time points of interest
         target_params: A dictionary containing information about the Hansen Solubility Parameters of the targeted resin (dD, dP, dH, R0, and solids)
+        temp_profile: The selected temperature profile
+        temp_params: A dictionary containing the parameters of the selected temperature profile
         caption: A string to be used in the "All Data" sheet name
     """
     if fname[-5:] != ".xlsx":
         fname = fname + ".xlsx"
-    
+    # Ensure at least one sheet is visible
+    wb = openpyxl.Workbook()
+    wb.create_sheet("Summary")
+    wb.create_sheet("Target")
+    wb.create_sheet("All Data")
+    wb.save(fname)
+
     with pd.ExcelWriter(fname) as writer:
         full_data = {"Time (min)": t}
         full_data.update({name: pp for pp, name in zip(partial_profiles, blend)})
@@ -374,23 +383,25 @@ def write_to_excel(fname, blend, t, total_profile, partial_profiles, RED, temper
         full_data["RED"] = RED.flatten()
         full_data["Temp (C)"] = temperatures
         full_data_df = pd.DataFrame.from_dict(full_data)
-        summary_df = pd.concat([full_data_df.loc[lambda df: df['Total'] < x, :].iloc[0].drop(["Total"]+list(blend)) for x in [1, .75, .5, .25, .1]], axis=1)
-        last_data = full_data_df.iloc[-1]
-        solvent_conc = [last_data[n] for n in blend]
-        tail = blend[np.argmax(solvent_conc)]
-        tail_solvent = full_data_df.loc[lambda df: df[tail]==1].iloc[0].drop(["Total"]+list(blend))
-        if tail_solvent.shape[0] > 0:
-            summary_df = pd.concat([summary_df, tail_solvent], axis=1).T
-            summary_df.index = ["100% Solvent Remaining", "75% Solvent Remaining", "50% Solvent Remaining", "25% Solvent Remaining", "10% Solvent Remaining", "Only Tail Solvent Remaining"]
-        else:
-            summary_df=summary_df.T
-            summary_df.index = ["100% Solvent Remaining", "75% Solvent Remaining", "50% Solvent Remaining", "25% Solvent Remaining", "10% Solvent Remaining"]
+        
+        # Modified summary creation
+        summary_data = []
+        for x in [1, 0.75, 0.5, 0.25, 0.1]:
+            row = full_data_df.loc[full_data_df['Total'] <= x].iloc[0] if any(full_data_df['Total'] <= x) else full_data_df.iloc[-1]
+            summary_data.append(row.drop(["Total"] + list(blend)))
+        summary_df = pd.concat(summary_data, axis=1).T
+        summary_df.index = ["100% Solvent Remaining", "75% Solvent Remaining", "50% Solvent Remaining", "25% Solvent Remaining", "10% Solvent Remaining"]
+        
         summary_df.to_excel(writer, sheet_name="Summary")
         
-        # Add initial temperature to target_params
-        target_params['Initial Temperature (C)'] = temperatures[0]
+        # Add temperature profile information to target_params
+        target_params['Temperature Profile'] = temp_profile
+        for param, value in temp_params.items():
+            target_params[f'Temp Profile - {param}'] = value
         
         target_df = pd.DataFrame.from_dict(target_params, orient='index', columns=['Value'])
         target_df.to_excel(writer, sheet_name="Target")
         
         full_data_df.to_excel(writer, sheet_name=f"All Data")
+
+    print(f"Excel file saved successfully: {fname}")

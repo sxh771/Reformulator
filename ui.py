@@ -13,6 +13,8 @@ import uuid
 import warnings
 import json
 import copy
+import matplotlib
+matplotlib.use('TkAgg')
 
 from simulator import *
 
@@ -69,124 +71,102 @@ class TempProfileEditor(tk.Toplevel):
                 
                 
                 
-
 class TempProfileFrame(ttk.Frame):
-        """
-        Frame for selecting and entering temperature ramp parameters. Used on main & reformulate screens.
-        """
-        def __init__(self, root):
-                super().__init__(root)
-                profile_options = {
-                        "Constant": {
-                                "vars": {
-                                        "temp": "Temperature (C)"
-                                }, 
-                                "func": "temp"
-                        },
-                        "Linear Ramp":{
-                                "vars":{
-                                        "flash_time": "Flash Time (min)", 
-                                        "start_temp": "Initial Temperature (C)", 
-                                        "end_temp": "Final Temperature (C)", 
-                                        "ramp_time": "Ramp Time (min)"
-                                }, 
-                                "func": "np.clip((t-flash_time)/ramp_time * (end_temp - start_temp) + start_temp, start_temp, end_temp)"
-                        },
-                        "Exponential Ramp": {
-                                "vars":{
-                                        "flash_time": "Flash Time (min)", 
-                                        "start_temp": "Initial Temperature (C)", 
-                                        "end_temp": "Final Temperature (C)", 
-                                        "ramp_time": "Ramp Time Constant (min)"
-                                },
-                                "func": "np.clip(end_temp - np.exp(-(t-flash_time)/ramp_time) * (end_temp - start_temp), start_temp, end_temp)"
-                        }
-                }
-                ttk.Label(self, text="Temperature Profile").grid(row=0, column=0)
-                #self.add_new_profile = ttk.Button(self, text="Add New", command=self.add_profile_option)
-                #self.add_new_profile.grid(row=0,column=1)
-                self.t_profile_selection = tk.StringVar(self)
-                self.t_profile_dropdown = None
-                self.profile_frames = []
-                self.update_profile_options(profile_options)
-
-        def add_profile_option(self):
-                
-                self.t_profile_dropdown.configure(values=self.t_profile_dropdown.cget("values")+[name])
-                new_frame = ttk.Frame(self)
-                new_frame.grid(row=len(self.profile_options.keys()),column=0,columnspan=2)
-                self.profile_frames.append(new_frame)
-                info["entry_map"] = dict()
-                for j, var_label in enumerate(profile_options[profile]["vars"].values()):
-                        ttk.Label(new_frame, text=var_label).grid(row=j,column=0)
-                        info["entry_map"][var_label] = ttk.Entry(new_frame)
-                        info["entry_map"][var_label].grid(row=j, column=1)
-                self.profile_options[name] = info
-                
-        def update_profile_options(self, profile_options):
-                if self.t_profile_dropdown is not None:
-                        self.t_profile_dropdown.destroy()
-                self.t_profile_dropdown = ttk.Combobox(self, textvariable=self.t_profile_selection, values=list(profile_options.keys()))
-                self.t_profile_dropdown.grid(row=0, column=1)
-                self.profile_options = copy.deepcopy(profile_options)
-                
-                for i, profile in enumerate(profile_options.keys()):
-                        self.profile_options[profile]["index"] = i
-                        cur_frame = ttk.Frame(self)
-                        cur_frame.grid(row=i+1,column=0,columnspan=2)
-                        self.profile_frames.append(cur_frame)
-                        self.profile_options[profile]["entry_map"] = dict()
-                        for j, var_label in enumerate(profile_options[profile]["vars"].values()):
-                                ttk.Label(cur_frame, text=var_label).grid(row=j,column=0)
-                                self.profile_options[profile]["entry_map"][var_label] = ttk.Entry(cur_frame)
-                                self.profile_options[profile]["entry_map"][var_label].grid(row=j, column=1)
-                self.t_profile_selection.trace("w",self.update_temp_entry)
-                self.t_profile_selection.set(list(self.profile_options.keys())[0])
-                
-        def update_temp_entry(self, *args):
-                show = self.profile_options[self.t_profile_selection.get()]["index"]
-                for i, frame in enumerate(self.profile_frames):
-                        if i == show:
-                                frame.grid()
-                        else:
-                                frame.grid_remove()
-
-        def get_temp_profile(self):
-                try:
-                        cur_profile = self.profile_options[self.t_profile_selection.get()]
-                except KeyError:
-                        tk.messagebox.showwarning(title="Invalid Input", message="Invalid temperature profile name")
-                        return
-                try:
-                        [float(e.get()) for e in cur_profile["entry_map"].values()]
-                except ValueError:
-                        tk.messagebox.showwarning(title="Invalid Input", message="Please enter decimal numbers for temperature curve parameters")
-                        return
-                try:
-                        t = np.arange(0, 10)
-                        exec("\n".join([f"{var}={cur_profile['entry_map'][var_label].get()}" for var, var_label in cur_profile["vars"].items()]))
-                        eval(cur_profile["func"])
-                except Exception:
-                        tk.messagebox.showwarning(title="Invalid Input", message="Invalid temperature curve function/parameter combination")
-                        return 
-                def temp_curve(t):
-                        exec("\n".join([f"{var}={cur_profile['entry_map'][var_label].get()}" for var, var_label in cur_profile["vars"].items()]))
-                        return eval(cur_profile["func"])
-                return temp_curve
-
-        def get_config(self):
-                ret = {k:copy.copy(v) for k, v in self.profile_options.items()}
-                for profile in ret.values():
-                        profile["entry_map"] = {k:v.get() for k, v in profile["entry_map"].items()}
-                return ret
+    def __init__(self, root):
+        super().__init__(root)
+        self.profile_options = {
+            "Constant": {
+                "vars": {
+                    "temp": "Temperature (C)"
+                }, 
+                "func": "temp"
+            },
+            "Linear Ramp":{
+                "vars":{
+                    "flash_time": "Flash Time (min)", 
+                    "start_temp": "Initial Temperature (C)", 
+                    "end_temp": "Final Temperature (C)", 
+                    "ramp_time": "Ramp Time (min)"
+                }, 
+                "func": "np.clip((t-flash_time)/ramp_time * (end_temp - start_temp) + start_temp, start_temp, end_temp)"
+            },
+            "Exponential Ramp": {
+                "vars":{
+                    "flash_time": "Flash Time (min)", 
+                    "start_temp": "Initial Temperature (C)", 
+                    "end_temp": "Final Temperature (C)", 
+                    "ramp_time": "Ramp Time Constant (min)"
+                },
+                "func": "np.clip(end_temp - np.exp(-(t-flash_time)/ramp_time) * (end_temp - start_temp), start_temp, end_temp)"
+            }
+        }
         
-        def set_config(self, config):
-                for name in config:
-                        if name in self.profile_options:
-                                for variable, entry in self.profile_options[name]["entry_map"].items():
-                                        if variable in config[name]["entry_map"]:
-                                                entry.delete(0, tk.END)
-                                                entry.insert(0, config[name]["entry_map"][variable])
+        ttk.Label(self, text="Temperature Profile").grid(row=0, column=0)
+        self.t_profile_selection = tk.StringVar(self)
+        self.t_profile_dropdown = ttk.OptionMenu(self, self.t_profile_selection, 
+                                                 list(self.profile_options.keys())[0], 
+                                                 *self.profile_options.keys(), 
+                                                 command=self.update_profile_frame)
+        self.t_profile_dropdown.grid(row=0, column=1)
+        
+        self.profile_frame = ttk.Frame(self)
+        self.profile_frame.grid(row=1, column=0, columnspan=2)
+        
+        self.update_profile_frame()
+
+    def update_profile_frame(self, *args):
+        for widget in self.profile_frame.winfo_children():
+            widget.destroy()
+        
+        selected_profile = self.t_profile_selection.get()
+        self.profile_options[selected_profile]["entry_map"] = {}
+        
+        for i, (var, label) in enumerate(self.profile_options[selected_profile]["vars"].items()):
+            ttk.Label(self.profile_frame, text=label).grid(row=i, column=0)
+            entry = ttk.Entry(self.profile_frame)
+            entry.grid(row=i, column=1)
+            self.profile_options[selected_profile]["entry_map"][var] = entry
+
+    def get_selected_profile(self):
+        selected_profile = self.t_profile_selection.get()
+        profile_params = {}
+        for var_label, entry in self.profile_options[selected_profile]["entry_map"].items():
+            try:
+                value = entry.get()
+                if not value:
+                    raise ValueError(f"Empty value for {var_label}")
+                profile_params[var_label] = float(value)
+            except Exception as e:
+                print(f"Error processing {var_label}: {str(e)}")
+                return None, None
+        return selected_profile, profile_params
+
+    def get_temp_profile(self):
+        selected_profile = self.t_profile_selection.get()
+        profile_params = {}
+        try:
+            for var_label, entry in self.profile_options[selected_profile]["entry_map"].items():
+                value = entry.get()
+                if not value:
+                    raise ValueError(f"Empty value for {var_label}")
+                profile_params[var_label] = float(value)
+            
+            func_str = self.profile_options[selected_profile]["func"]
+            temp_func = lambda t: eval(func_str, globals(), {**profile_params, 't': t, 'np': np})
+            
+            # Test the function
+            test_t = 0
+            test_result = temp_func(test_t)
+            if not isinstance(test_result, (int, float)):
+                raise ValueError(f"Function returned non-numeric result: {test_result}")
+            
+            return temp_func
+        except Exception as e:
+            tk.messagebox.showwarning(title="Invalid Input", message=f"Error in temperature curve: {str(e)}")
+            return None
+
+
+
                                                 
 
 class TargetParamFrame(ttk.Frame):
@@ -238,8 +218,12 @@ class MainInputFrame(ttk.Frame):
         """
         Handles all input for the main program screen.
         """
-        def __init__(self, root, graph, compare_input, compare_screen, reform_input, reform_screen):
-                super().__init__(root)
+
+        def __init__(self, master, graph, compare_input, compare_screen, reform_input, reform_screen):
+                super().__init__(master)
+                # Store the passed parameters as instance variables
+                self.master = master
+
                 self.graph = graph
                 self.compare_input = compare_input
                 self.compare_screen = compare_screen
@@ -283,6 +267,9 @@ class MainInputFrame(ttk.Frame):
                 ttk.Button(self, text="Load Config", style='big.TButton', command=self.read_config).grid(row=17,column=0)
                 ttk.Button(self, text="Save Config", style='big.TButton', command=self.write_config).grid(row=17,column=1)
                 self.all_solvents_df = None
+
+                # Initialize formulation_df as an empty DataFrame
+                self.formulation_df = pd.DataFrame()
 
         def show_error_message(self, message):
                 root = tk.Tk()
@@ -373,6 +360,11 @@ class MainInputFrame(ttk.Frame):
 
         def run_evap_predictor(self):
 
+                # Check if formulation_df is empty
+                if self.formulation_df.empty:
+                        tk.messagebox.showwarning(title="No Formulation", message="Please load or enter a formulation before running the predictor.")
+                        return
+
                 try:
                         volume = self.formulation_df["Weight Fraction"] / np.array(self.all_solvents_df["Density"][self.formulation_df["Name"]])
                 except KeyError as e:
@@ -412,12 +404,23 @@ class MainInputFrame(ttk.Frame):
                 target = self.target_frame.get_params()
                 if target is None:
                         return
+                
+                print("Getting temperature profile...")
                 temp_curve = self.temp_frame.get_temp_profile()
                 if temp_curve is None:
+                        print("Temperature profile is None")
                         return
+                
+                print("Getting selected profile...")
+                # Get the selected temperature profile and its parameters
+                self.temp_profile, self.temp_params = self.temp_frame.get_selected_profile()
+                print(f"Selected profile: {self.temp_profile}")
+                print(f"Profile parameters: {self.temp_params}")
+
                 self.t, self.total_profile, self.partial_profiles, self.RED = get_evap_curve(conc, blend, target, temp_curve, t_span,
-                                                                                             self.all_solvents_df, self.convert_to_weight)
+                                                                                                self.all_solvents_df, self.convert_to_weight)
                 self.temp = [temp_curve(ts) for ts in self.t]
+
                 self.graph.clear_artists()
                 self.graph.temp_ax.plot(self.t, self.temp)
                 self.graph.temp_ax.relim()
@@ -437,11 +440,19 @@ class MainInputFrame(ttk.Frame):
                 fname = tk.filedialog.asksaveasfilename(defaultextension=".xlsx")
                 if fname:
                         target_params = self.target_frame.get_params()
+                        if target_params is None:
+                                return
                         target_params['Total Time (min)'] = float(self.total_time.get())
                         target_params['Initial Temperature (C)'] = self.temp[0]
 
+                        # write_to_excel(fname, self.formulation_df["Name"], self.t, self.total_profile,
+                        # self.partial_profiles, self.RED, self.temp, target_params, caption=self.formulation_fname)
+
+                        # Get the temperature profile and parameters
+                        temp_profile, temp_params = self.temp_frame.get_selected_profile()
+
                         write_to_excel(fname, self.formulation_df["Name"], self.t, self.total_profile,
-                        self.partial_profiles, self.RED, self.temp, target_params, caption=self.formulation_fname)
+                        self.partial_profiles, self.RED, self.temp, target_params, temp_profile, temp_params, caption=self.formulation_fname)
 
         def get_config(self):
                 return {"temp_frame": self.temp_frame.get_config(),
@@ -477,13 +488,7 @@ class MainInputFrame(ttk.Frame):
                 
 from tkinter import messagebox
 
-# # ... (rest of your imports and code)
 
-# def show_error_message(self, message):
-#         root = tk.Tk()
-#         root.withdraw()  # Hide the main window
-#         messagebox.showerror("Error", message)
-#         root.destroy()
 
 
 
@@ -601,6 +606,8 @@ class ReformInputFrame(ttk.Frame):
         """
         def __init__(self, root, compare_screen, compare_input, results_frame):
                 super().__init__(root)
+                # self.columnconfigure(0, weight=1)
+                # self.rowconfigure(0, weight=1)
                 self.compare_screen = compare_screen
                 self.compare_input = compare_input
                 self.results_frame = results_frame
@@ -941,6 +948,8 @@ class ReformResultsFrame(ttk.Frame):
         """
         def __init__(self, root):
                 super().__init__(root)
+                # self.columnconfigure(0, weight=1)
+                # self.rowconfigure(0, weight=1)
                 self.big_style = ttk.Style()
                 self.big_style.configure("big.TLabel", font=('Arial',14))
                 self.big_style.configure("big.TButton", font=('Arial',14))
@@ -1073,34 +1082,49 @@ class GraphFrame(ttk.Frame):
                     artist.remove()
 
 if __name__ == "__main__":
-        root = tk.Tk()
-        root.wm_title("Extended Evaporation Simulator")
-        compare_screen = tk.Toplevel(root)
-        compare_screen.wm_title("Evaporation Simulator Comparison Tool")
-        compare_graph = GraphFrame(compare_screen)
-        compare_input = CompareInputFrame(compare_screen, compare_graph)
-        compare_input.grid(row=0, column=0, sticky="NSEW")
-        compare_graph.grid(row=0, column=1, sticky="NSEW")
-        compare_screen.withdraw()
-        compare_screen.protocol("WM_DELETE_WINDOW", compare_screen.withdraw)
-        reform_screen = tk.Toplevel(root)
-        reform_results = ReformResultsFrame(reform_screen)
-        reform_results.grid(row=0,column=1)
-        reform_input = ReformInputFrame(reform_screen, compare_screen, compare_input, reform_results)
-        reform_input.grid(row=0,column=0)
-        reform_results.set_input_frame(reform_input)
-        reform_screen.withdraw()
-        reform_screen.protocol("WM_DELETE_WINDOW", reform_screen.withdraw)
-        
-        graph_frame = GraphFrame(root)
-        input_frame = MainInputFrame(root, graph_frame, compare_input, compare_screen, reform_input, reform_screen)
-        
-        # Use grid with sticky option to make frames expand
-        input_frame.grid(column=0, row=0, sticky="NSEW")
-        graph_frame.grid(column=1, row=0, sticky="NSEW")
-        
-        # Configure the root window to allow expansion
-        root.columnconfigure(1, weight=1)
-        root.rowconfigure(0, weight=1)
-        
-        root.mainloop()
+    root = tk.Tk()
+    root.wm_title("Extended Evaporation Simulator")
+    compare_screen = tk.Toplevel(root)
+    compare_screen.wm_title("Evaporation Simulator Comparison Tool")
+    compare_graph = GraphFrame(compare_screen)
+    compare_input = CompareInputFrame(compare_screen, compare_graph)
+    compare_input.grid(row=0, column=0, sticky="NSEW")
+    compare_graph.grid(row=0, column=1, sticky="NSEW")
+    
+    # Configure compare_screen for expansion
+    compare_screen.columnconfigure(1, weight=1)
+    compare_screen.rowconfigure(0, weight=1)
+    
+    compare_screen.withdraw()
+    compare_screen.protocol("WM_DELETE_WINDOW", compare_screen.withdraw)
+    reform_screen = tk.Toplevel(root)
+    reform_screen.wm_title("Reformulation Tool")  # Add a title if you haven't already
+
+# Configure reform_screen for expansion
+    reform_screen.columnconfigure(0, weight=1)
+    reform_screen.columnconfigure(1, weight=1)
+    reform_screen.rowconfigure(0, weight=1)
+
+    reform_results = ReformResultsFrame(reform_screen)
+    reform_input = ReformInputFrame(reform_screen, compare_screen, compare_input, reform_results)
+
+# Use grid with sticky option to make frames expand
+    reform_input.grid(row=0, column=0, sticky="NSEW")
+    reform_results.grid(row=0, column=1, sticky="NSEW")
+
+    reform_results.set_input_frame(reform_input)
+    reform_screen.withdraw()
+    reform_screen.protocol("WM_DELETE_WINDOW", reform_screen.withdraw)
+    
+    graph_frame = GraphFrame(root)
+    input_frame = MainInputFrame(root, graph_frame, compare_input, compare_screen, reform_input, reform_screen)
+    
+    # Use grid with sticky option to make frames expand
+    input_frame.grid(column=0, row=0, sticky="NSEW")
+    graph_frame.grid(column=1, row=0, sticky="NSEW")
+    
+    # Configure the root window to allow expansion
+    root.columnconfigure(1, weight=1)
+    root.rowconfigure(0, weight=1)
+    
+    root.mainloop()
