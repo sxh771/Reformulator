@@ -318,6 +318,8 @@ def get_alternative_blends(all_solvents, control_blend, min_comp, replace_by, ta
         return list(filter(lambda x: x["cost"] <= sorted_results[0]["cost"] * 2, sorted_results))
                 
 
+
+
 def group_similar_results(results, num_solvents):
         """
         Creates a nested dictionary of results in the same format as is displayed in the "Alternative Blends" tab of the reformulation window
@@ -348,7 +350,7 @@ def group_similar_results(results, num_solvents):
                                 current_level[r["order"][-1].name] = {"result": r}
         return grouped_results
 
-import re
+
 
 def write_to_excel(fname, blend, t, total_profile, partial_profiles, RED, temperatures, target_params, temp_profile, temp_params, caption=""):
     """
@@ -405,3 +407,4 @@ def write_to_excel(fname, blend, t, total_profile, partial_profiles, RED, temper
         full_data_df.to_excel(writer, sheet_name=f"All Data")
 
     print(f"Excel file saved successfully: {fname}")
+

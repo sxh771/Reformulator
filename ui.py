@@ -1,20 +1,25 @@
 import numpy as np
-import pandas as pde
-import itertools
-import math
+import pandas as pd
+# import itertools
+# import math
 import tkinter.ttk as ttk
 import tkinter as tk
+from tkinter import ttk, messagebox, filedialog
+
 from matplotlib.backends.backend_tkagg import (
     FigureCanvasTkAgg, NavigationToolbar2Tk)
 from matplotlib.backend_bases import key_press_handler
 from matplotlib.figure import Figure
 import os
 import uuid
-import warnings
+# import warnings
 import json
-import copy
+# import copy
 import matplotlib
 matplotlib.use('TkAgg')
+
+import sys
+import subprocess
 
 from simulator import *
 
@@ -436,23 +441,73 @@ class MainInputFrame(ttk.Frame):
                 self.graph.conc_ax.legend(fontsize=6)
                 self.graph.canvas.draw()
 
+
         def write_output(self):
                 fname = tk.filedialog.asksaveasfilename(defaultextension=".xlsx")
-                if fname:
-                        target_params = self.target_frame.get_params()
-                        if target_params is None:
-                                return
-                        target_params['Total Time (min)'] = float(self.total_time.get())
-                        target_params['Initial Temperature (C)'] = self.temp[0]
+                if not fname:
+                        return  # User cancelled the file dialog
 
-                        # write_to_excel(fname, self.formulation_df["Name"], self.t, self.total_profile,
-                        # self.partial_profiles, self.RED, self.temp, target_params, caption=self.formulation_fname)
+                target_params = self.target_frame.get_params()
+                if target_params is None:
+                        return
 
-                        # Get the temperature profile and parameters
-                        temp_profile, temp_params = self.temp_frame.get_selected_profile()
+                temp_profile, temp_params = self.temp_frame.get_selected_profile()
 
-                        write_to_excel(fname, self.formulation_df["Name"], self.t, self.total_profile,
-                        self.partial_profiles, self.RED, self.temp, target_params, temp_profile, temp_params, caption=self.formulation_fname)
+                if hasattr(self, 'selected_blend') and self.selected_blend:
+                        # This is for the Reformulation Tool screen
+                        blend = self.selected_blend
+                        conc = self.selected_conc
+                        replace_by = self.replace_by
+                        caption = "Reformulation"
+                        
+                        # Recalculate evaporation curve for the selected blend
+                        t_span = [0, float(self.total_time.get())]
+                        a_comp = [self.main_input.all_solvents_df.loc[name,:] for name in blend]
+                        if hasattr(self, 'min_comp'):
+                                a_comp += [self.main_input.all_solvents_df.loc[name,:] for name in self.min_comp["Name"]]
+                                if replace_by == "Weight Fraction":
+                                        a_wf = np.array(list(conc) + list(self.min_comp["Weight Fraction"]))
+                                        a_c0 = a_wf * np.array(pd.DataFrame(a_comp)["Density"])
+                                        a_c0 /= sum(a_c0)
+                                else:
+                                        a_c0 = np.array(list(conc) + list(self.min_comp["Volume Fraction"]))
+                        else:
+                                a_c0 = np.array(conc)
+                        
+                        temp_curve = self.temp_frame.get_temp_profile()
+                        t, total_profile, partial_profiles, RED = get_evap_curve(a_c0, a_comp, target_params, temp_curve, t_span, self.main_input.all_solvents_df, replace_by == "Weight Fraction")
+                        temp = temp_curve(t)
+                        
+                        if hasattr(self, 'min_comp'):
+                                blend = blend + list(self.min_comp["Name"])
+                else:
+                        # This is for the Evaporation Simulator Comparison Tool screen
+                        blend = self.formulation_df["Name"]
+                        t = self.t
+                        total_profile = self.total_profile
+                        partial_profiles = self.partial_profiles
+                        RED = self.RED
+                        temp = self.temp
+                        caption = self.formulation_fname
+
+                target_params['Total Time (min)'] = float(self.total_time.get())
+                target_params['Initial Temperature (C)'] = temp[0]
+
+                write_to_excel(fname, blend, t, total_profile, partial_profiles, RED, temp, 
+                               target_params, temp_profile, temp_params, caption=caption)
+
+                # Open the file using the default application
+                if sys.platform.startswith('darwin'):  # macOS
+                        subprocess.call(('open', fname))
+                elif sys.platform.startswith('linux'):  # Linux
+                        subprocess.call(('xdg-open', fname))
+                elif sys.platform.startswith('win'):  # Windows
+                        os.startfile(fname)
+                else:
+                        print(f"File saved at: {fname}")
+
+                tk.messagebox.showinfo("Export Successful", f"Data exported to {fname}")
+
 
         def get_config(self):
                 return {"temp_frame": self.temp_frame.get_config(),
@@ -894,16 +949,11 @@ class ReformInputFrame(ttk.Frame):
                 self.compare_input.add_files([control_path, alternative_path])
                 self.compare_screen.deiconify()
                 
-        def export_output(self, selected_blend, selected_conc, replace_by):
-                """
-                Exports the currently selected blend to an Excel sheet
 
-                Args:
-                        selected_conc: Initial concentration of solvents in selected blend (weight %)
-                        selected_blend: A list of pandas DataFrame rows containing information about the solvents in the selected blend  
-                """
+        def export_output(self, selected_blend, selected_conc, replace_by):
                 target = self.target_frame.get_params()
                 temp_curve = self.temp_frame.get_temp_profile()
+                temp_profile, temp_params = self.temp_frame.get_selected_profile()
                 t_span = [0, float(self.total_time.get())]
                 a_comp = [self.main_input.all_solvents_df.loc[name,:] for name in selected_blend] + [self.main_input.all_solvents_df.loc[name,:] for name in self.min_comp["Name"]]
                 if replace_by == "Weight Fraction":
@@ -912,13 +962,26 @@ class ReformInputFrame(ttk.Frame):
                         a_c0 /= sum(a_c0)
                 else:
                         a_c0 = np.array(list(selected_conc)+list(self.min_comp["Volume Fraction"]))
+
                 a_t, a_total_profile, a_partial_profiles, a_RED = get_evap_curve(a_c0, a_comp, target, temp_curve, t_span, self.main_input.all_solvents_df, replace_by == "Weight Fraction")
                 alternative_path = tk.filedialog.asksaveasfilename()
+
                 self.focus_force()
-                write_to_excel(alternative_path, selected_blend+list(self.min_comp["Name"]), a_t, a_total_profile, a_partial_profiles, a_RED, temp_curve(a_t), caption=replace_by)
+                write_to_excel(alternative_path, selected_blend+list(self.min_comp["Name"]), a_t, a_total_profile, 
+                                a_partial_profiles, a_RED, temp_curve(a_t), target, temp_profile, temp_params, caption=replace_by)
+                
                 if alternative_path[-5:] != ".xlsx":
                         alternative_path = alternative_path + ".xlsx"
-                os.startfile(alternative_path)
+                # Open the file using the default application
+                if sys.platform.startswith('darwin'):  # macOS
+                        subprocess.call(('open', alternative_path))
+                elif sys.platform.startswith('linux'):  # Linux
+                        subprocess.call(('xdg-open', alternative_path))
+                elif sys.platform.startswith('win'):  # Windows
+                        os.startfile(alternative_path)
+                else:
+                        print(f"File saved at: {alternative_path}")
+
         def get_config(self):
                 return {"control_fname": self.control_fname,
                         "mc_fname": self.mc_fname,
@@ -970,9 +1033,21 @@ class ReformResultsFrame(ttk.Frame):
                 self.input_frame.compare_to_control(self.selected_blend, self.selected_conc, self.replace_by)
 
         def export_output(self):
-                self.input_frame.export_output(self.selected_blend, self.selected_conc, self.replace_by)
+                try:
+                        if not hasattr(self, 'selected_blend') or not self.selected_blend:
+                                tk.messagebox.showwarning("No Data", "Please select a blend to export.")
+                                return
                 
-        def update_selection(self, _):
+                        print(f"Exporting blend: {self.selected_blend}")
+                        print(f"Concentrations: {self.selected_conc}")
+                        print(f"Replace by: {self.replace_by}")
+                
+                        self.input_frame.export_output(self.selected_blend, self.selected_conc, self.replace_by)
+                except Exception as e:
+                        print(f"Error in export_output: {str(e)}")
+                        tk.messagebox.showerror("Export Error", f"An error occurred during export: {str(e)}")
+                
+        def update_selection(self, event):
                 """
                 Updates which blend is currently selected.
                 Behavior:
@@ -981,8 +1056,6 @@ class ReformResultsFrame(ttk.Frame):
                 - If the currently selected solvent has results, use the blend up to that point
                 - Otherwise, step down the tree (using the first child of each element) until we reach a blend with results. This will return the lowest cost blend that contains our selection.
                 """
-                self.compare_button.configure(state="normal")
-                self.export_button.configure(state="normal")
                 cur_id = self.display.selection()[0]
                 cur_item = self.display.item(cur_id)
                 names = []
@@ -997,15 +1070,39 @@ class ReformResultsFrame(ttk.Frame):
                         if name == "Results":
                                 self.selected_blend = blend
                                 self.selected_conc = cur_reference["result"]["conc"]
+                                self.replace_by = self.input_frame.replace_by
+                                self.compare_button.configure(state="normal")
+                                self.export_button.configure(state="normal")
                                 return
                         blend.append(name)
-                        cur_reference = cur_reference[name]
-                while "result" not in cur_reference.keys():
-                        next_key = list(cur_reference.keys())[0]
+                        if name in cur_reference:
+                                cur_reference = cur_reference[name]
+                        else:
+                                # If the name is not in cur_reference, we've reached an unexpected state
+                                print(f"Warning: Unexpected tree structure. Name '{name}' not found in current reference.")
+                                return
+
+                # If we've reached this point, we haven't found a "Results" node
+                # We'll use the last valid blend we found
+                while cur_reference and "result" not in cur_reference:
+                        if not cur_reference:
+                                print("Warning: Reached end of tree without finding results.")
+                                return
+                        next_key = next(iter(cur_reference), None)
+                        if next_key is None:
+                                print("Warning: Empty dictionary encountered in tree.")
+                                return
                         blend.append(next_key)
                         cur_reference = cur_reference[next_key]
-                self.selected_blend = blend
-                self.selected_conc = cur_reference["result"]["conc"]
+
+                if "result" in cur_reference:
+                        self.selected_blend = blend
+                        self.selected_conc = cur_reference["result"]["conc"]
+                        self.replace_by = self.input_frame.replace_by
+                        self.compare_button.configure(state="normal")
+                        self.export_button.configure(state="normal")
+                else:
+                        print("Warning: No results found for the selected item.")
         def make_tree(self, grouped_results, replace_by):
                 self.grouped_results = grouped_results
                 self.replace_by = replace_by
