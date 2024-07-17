@@ -4,7 +4,7 @@ import itertools
 import math
 import tkinter.ttk as ttk
 import tkinter as tk
-from tkinter import ttk, messagebox, filedialog
+from tkinter import messagebox, filedialog
 
 from matplotlib.backends.backend_tkagg import (
     FigureCanvasTkAgg, NavigationToolbar2Tk)
@@ -20,12 +20,20 @@ import warnings
 import json
 # import copy
 import matplotlib
-matplotlib.use('TkAgg')
+# matplotlib.use('TkAgg')
 
 import sys
 # import subprocess
 
 from simulator import *
+
+# import objc
+
+import matplotlib
+matplotlib.use('TkAgg')  # Ensure using the Tkinter backend
+from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2Tk
+from matplotlib.backend_bases import key_press_handler
+from matplotlib.figure import Figure
 
 # Not yet implemented - window allowing users to add custom temperature profiles.
 class TempProfileEditor(tk.Toplevel):
@@ -81,8 +89,8 @@ class TempProfileEditor(tk.Toplevel):
                 
                 
 class TempProfileFrame(ttk.Frame):
-    def __init__(self, root):
-        super().__init__(root)
+    def __init__(self,parent):
+        super().__init__(parent)
         self.profile_options = {
             "Constant": {
                 "vars": {
@@ -1178,6 +1186,19 @@ class GraphFrame(ttk.Frame):
                     artist.remove()
                 for artist in self.conc_ax.lines + self.conc_ax.collections:
                     artist.remove()
+
+
+
+
+import logging
+
+# logging.basicConfig(level=logging.DEBUG)
+
+
+
+
+
+
 
 if __name__ == "__main__":
     root = tk.Tk()
