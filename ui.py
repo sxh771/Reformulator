@@ -769,12 +769,25 @@ class ReformInputFrame(ttk.Frame):
                         self.focus_force()
                         return
                 self.mc_fname = fname
-                if "Name" not in self.min_comp.columns or ("Weight Fraction" not in self.min_comp.columns and "Volume Fraction" not in self.min_comp.columns):
-                        tk.messagebox.showwarning(title="Invalid Input", message="Incorrectly formatted minimum composition file")
+                # if "Name" not in self.min_comp.columns or ("Weight Fraction" not in self.min_comp.columns and "Volume Fraction" not in self.min_comp.columns):
+                #         tk.messagebox.showwarning(title="Invalid Input", message="Incorrectly formatted minimum composition file")
+                #         self.mc_fname = None
+                #         self.min_comp = None
+                #         self.focus_force()
+                #         return
+                if "Name" not in self.min_comp.columns:
+                        tk.messagebox.showwarning(title="Invalid Input", message="Minimum composition file is missing the 'Name' column.")
                         self.mc_fname = None
                         self.min_comp = None
                         self.focus_force()
                         return
+                if "Weight Fraction" not in self.min_comp.columns and "Volume Fraction" not in self.min_comp.columns:
+                        tk.messagebox.showwarning(title="Invalid Input", message="Minimum composition file is missing both 'Weight Fraction' and 'Volume Fraction' columns. At least one is required.")
+                        self.mc_fname = None
+                        self.min_comp = None
+                        self.focus_force()
+                        return
+
                 self.min_comp_label.configure(text=os.path.basename(fname))
                 self.focus_force()
         def load_wl_bl(self, fname=None):
@@ -833,19 +846,23 @@ class ReformInputFrame(ttk.Frame):
                         max_exempt = int(self.solvent_nums["max_exempt"].get())
                         min_ne = int(self.solvent_nums["min_ne"].get())
                         max_ne = int(self.solvent_nums["max_ne"].get())
-                        assert max_exempt > min_exempt
-                        assert max_ne > min_ne
-                except Exception:
-                        tk.messagebox.showwarning(title="Invalid Input", message="Please enter integers (max > min) for min/max solvents to use")
+                        if max_exempt <= min_exempt:
+                                raise ValueError("Maximum exempt solvents must be greater than minimum.")
+                        if max_ne <= min_ne:
+                                raise ValueError("Maximum non-exempt solvents must be greater than minimum.")
+
+                except ValueError as e:
+                        tk.messagebox.showwarning(title="Invalid Input", message=f"Error in solvent numbers: {str(e)}\nPlease enter valid integers with max > min for both exempt and non-exempt solvents.")
                         self.focus_force()
                         return
                 try:
                         max_voc = float(self.max_VOC.get())
                         if self.max_VOC_type.get() in ["vol %", "wt %"]:
-                                assert 0 <= max_voc <= 100
+                                if not 0 <= max_voc <= 100:
+                                        raise ValueError("VOC must be between 0 and 100.")
                                 max_voc /= 100
-                except Exception:
-                        tk.messagebox.showwarning(title="Invalid Input", message="Enter a decimal number for max VOC (0 < VOC < 100 for wt or vol %)")
+                except ValueError as e:
+                        tk.messagebox.showwarning(title="Invalid Input", message=f"Error in max VOC: {str(e)}\nPlease enter a decimal number between 0 and 100 for max VOC.")
                         self.focus_force()
                         return
                 target_params = self.target_frame.get_params()
@@ -853,29 +870,48 @@ class ReformInputFrame(ttk.Frame):
                 if target_params is None or temp_profile is None:
                         return
                 if self.main_input.all_solvents_df is None:
-                        tk.messagebox.showwarning(title="Missing file", message="Missing solvent info file")
+                        tk.messagebox.showwarning(title="Missing File", message="Solvent info file is missing. Please load a solvent info file before proceeding.")
                         self.focus_force()
                         return
                 if self.using_whitelist:
-                        if not all([solvent in self.main_input.all_solvents_df.index for solvent in self.whitelist]):
-                                tk.messagebox.showwarning(title="Invalid Input", message="Whitelist incorrectly configured")
+                        missing_solvents = []
+                        for solvent in self.whitelist:
+                                if solvent not in self.main_input.all_solvents_df.index:
+                                        missing_solvents.append(str(solvent))
+                        if missing_solvents:
+                                tk.messagebox.showwarning(title="Invalid Input", message=f"The following solvents in the whitelist are not in the solvent database: {', '.join(missing_solvents)}")
                                 self.focus_force()
                                 return
-                elif not all([solvent in self.main_input.all_solvents_df.index for solvent in self.blacklist]):
-                        tk.messagebox.showwarning(title="Invalid Input", message="Blacklist incorrectly configured")
+                elif self.blacklist is not None:
+                        missing_solvents = []
+                        for solvent in self.blacklist:
+                                if solvent not in self.main_input.all_solvents_df.index:
+                                        missing_solvents.append(str(solvent))
+                        if missing_solvents:
+                                tk.messagebox.showwarning(title="Invalid Input", message=f"The following solvents in the blacklist are not in the solvent database: {', '.join(missing_solvents)}")
+                                self.focus_force()
+                                return
+
+                replace_by = "Volume Fraction" if "Volume Fraction" in self.min_comp.columns else "Weight Fraction"
+                missing_solvents = []
+                for solvent in self.min_comp["Name"]:
+                        if solvent not in self.main_input.all_solvents_df.index:
+                                missing_solvents.append(str(solvent))
+                if missing_solvents:
+                        tk.messagebox.showwarning(title="Invalid Input", message=f"The following solvents in the minimum composition are not in the solvent database: {', '.join(missing_solvents)}")
                         self.focus_force()
                         return
-                replace_by = "Volume Fraction" if "Volume Fraction" in self.min_comp.columns else "Weight Fraction"  
-                if not all([solvent in self.main_input.all_solvents_df.index for solvent in self.min_comp["Name"]]) or str(self.min_comp[replace_by].dtype)[:-2] not in ['int','float']:
-                        tk.messagebox.showwarning(title="Invalid Input", message="Minimum composition incorrectly configured")
+                if str(self.min_comp[replace_by].dtype)[:-2] not in ['int','float']:
+                        tk.messagebox.showwarning(title="Invalid Input", message=f"The {replace_by} column in the minimum composition file contains non-numeric values.")
                         self.focus_force()
                         return
+
                 try:
                         formulation_density = float(self.density_entry.get())
                         if self.density_units.get() == "g/L":
                                 formulation_density *= 0.0083
-                except Exception:
-                        tk.messagebox.showwarning(title="Invalid Input", message="Enter a decimal number for formulation density (0 if unknown)")
+                except ValueError:
+                        tk.messagebox.showwarning(title="Invalid Input", message="Please enter a valid decimal number for formulation density (or 0 if unknown).")
                         self.focus_force()
                         return
 
