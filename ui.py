@@ -1,7 +1,7 @@
 import numpy as np
 import pandas as pd
-# import itertools
-# import math
+import itertools
+import math
 import tkinter.ttk as ttk
 import tkinter as tk
 from tkinter import ttk, messagebox, filedialog
@@ -10,16 +10,20 @@ from matplotlib.backends.backend_tkagg import (
     FigureCanvasTkAgg, NavigationToolbar2Tk)
 from matplotlib.backend_bases import key_press_handler
 from matplotlib.figure import Figure
+
 import os
+os.environ['OBJC_DISABLE_INITIALIZE_FORK_SAFETY'] = 'YES'
+
+
 import uuid
-# import warnings
+import warnings
 import json
 # import copy
 import matplotlib
 matplotlib.use('TkAgg')
 
 import sys
-import subprocess
+# import subprocess
 
 from simulator import *
 
@@ -216,9 +220,6 @@ class TargetParamFrame(ttk.Frame):
                         entry.delete(0, tk.END)
                         entry.insert(0, value)
         
-
-                
-
 class MainInputFrame(ttk.Frame):
         """
         Handles all input for the main program screen.
@@ -496,16 +497,16 @@ class MainInputFrame(ttk.Frame):
                 write_to_excel(fname, blend, t, total_profile, partial_profiles, RED, temp, 
                                target_params, temp_profile, temp_params, caption=caption)
 
-                # Open the file using the default application
-                if sys.platform.startswith('darwin'):  # macOS
-                        subprocess.call(('open', fname))
-                elif sys.platform.startswith('linux'):  # Linux
-                        subprocess.call(('xdg-open', fname))
-                elif sys.platform.startswith('win'):  # Windows
-                        os.startfile(fname)
-                else:
-                        print(f"File saved at: {fname}")
-
+                # # Open the file using the default application
+                # if sys.platform.startswith('darwin'):  # macOS
+                #         subprocess.call(('open', fname))
+                # elif sys.platform.startswith('linux'):  # Linux
+                #         subprocess.call(('xdg-open', fname))
+                # elif sys.platform.startswith('win'):  # Windows
+                #         os.startfile(fname)
+                # else:
+                #         print(f"File saved at: {fname}")
+                os.startfile(fname)
                 tk.messagebox.showinfo("Export Successful", f"Data exported to {fname}")
 
 
@@ -972,16 +973,17 @@ class ReformInputFrame(ttk.Frame):
                 
                 if alternative_path[-5:] != ".xlsx":
                         alternative_path = alternative_path + ".xlsx"
-                # Open the file using the default application
-                if sys.platform.startswith('darwin'):  # macOS
-                        subprocess.call(('open', alternative_path))
-                elif sys.platform.startswith('linux'):  # Linux
-                        subprocess.call(('xdg-open', alternative_path))
-                elif sys.platform.startswith('win'):  # Windows
-                        os.startfile(alternative_path)
-                else:
-                        print(f"File saved at: {alternative_path}")
-
+                # # Open the file using the default application
+                # if sys.platform.startswith('darwin'):  # macOS
+                #         subprocess.call(('open', alternative_path))
+                # elif sys.platform.startswith('linux'):  # Linux
+                #         subprocess.call(('xdg-open', alternative_path))
+                # elif sys.platform.startswith('win'):  # Windows
+                #         os.startfile(alternative_path)
+                # else:
+                #         print(f"File saved at: {alternative_path}")
+                os.startfile(alternative_path)
+                
         def get_config(self):
                 return {"control_fname": self.control_fname,
                         "mc_fname": self.mc_fname,
@@ -1070,7 +1072,7 @@ class ReformResultsFrame(ttk.Frame):
                         if name == "Results":
                                 self.selected_blend = blend
                                 self.selected_conc = cur_reference["result"]["conc"]
-                                self.replace_by = self.input_frame.replace_by
+                                # Remove the reference to self.input_frame.replace_by
                                 self.compare_button.configure(state="normal")
                                 self.export_button.configure(state="normal")
                                 return
@@ -1078,7 +1080,6 @@ class ReformResultsFrame(ttk.Frame):
                         if name in cur_reference:
                                 cur_reference = cur_reference[name]
                         else:
-                                # If the name is not in cur_reference, we've reached an unexpected state
                                 print(f"Warning: Unexpected tree structure. Name '{name}' not found in current reference.")
                                 return
 
@@ -1098,7 +1099,7 @@ class ReformResultsFrame(ttk.Frame):
                 if "result" in cur_reference:
                         self.selected_blend = blend
                         self.selected_conc = cur_reference["result"]["conc"]
-                        self.replace_by = self.input_frame.replace_by
+                        # Remove the reference to self.input_frame.replace_by
                         self.compare_button.configure(state="normal")
                         self.export_button.configure(state="normal")
                 else:
