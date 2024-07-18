@@ -6,8 +6,7 @@ import tkinter.ttk as ttk
 import tkinter as tk
 from tkinter import messagebox, filedialog
 
-from matplotlib.backends.backend_tkagg import (
-    FigureCanvasTkAgg, NavigationToolbar2Tk)
+from matplotlib.backends.backend_tkagg import (FigureCanvasTkAgg, NavigationToolbar2Tk)
 from matplotlib.backend_bases import key_press_handler
 from matplotlib.figure import Figure
 
@@ -19,21 +18,19 @@ import uuid
 import warnings
 import json
 # import copy
-import matplotlib
-# matplotlib.use('TkAgg')
 
 import sys
-# import subprocess
 
 from simulator import *
 
-# import objc
-
 import matplotlib
 matplotlib.use('TkAgg')  # Ensure using the Tkinter backend
-from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2Tk
-from matplotlib.backend_bases import key_press_handler
-from matplotlib.figure import Figure
+
+import warnings
+warnings.filterwarnings('ignore')
+
+import subprocess
+import platform
 
 # Not yet implemented - window allowing users to add custom temperature profiles.
 class TempProfileEditor(tk.Toplevel):
@@ -184,8 +181,6 @@ class TempProfileFrame(ttk.Frame):
 
 
 
-                                                
-
 class TargetParamFrame(ttk.Frame):
         """
         Frame for entering target resin parameters. Used on main & reformulate screens.
@@ -233,10 +228,10 @@ class MainInputFrame(ttk.Frame):
         Handles all input for the main program screen.
         """
 
-        def __init__(self, master, graph, compare_input, compare_screen, reform_input, reform_screen):
-                super().__init__(master)
+        def __init__(self, root, graph, compare_input, compare_screen, reform_input, reform_screen):
+                super().__init__(root)
                 # Store the passed parameters as instance variables
-                self.master = master
+                # self.master = master
 
                 self.graph = graph
                 self.compare_input = compare_input
@@ -550,15 +545,7 @@ class MainInputFrame(ttk.Frame):
                 with open(fname) as f:
                         self.set_config(json.load(f))
                 
-from tkinter import messagebox
 
-
-
-
-
-# Rest of your code continues here
-                
-                
 
 class CompareInputFrame(ttk.Frame):
         """
@@ -675,6 +662,8 @@ class ReformInputFrame(ttk.Frame):
                 self.compare_screen = compare_screen
                 self.compare_input = compare_input
                 self.results_frame = results_frame
+                self.results_frame.set_input_frame(self)
+
                 ttk.Button(self, text="Load Control Blend", command=self.load_control_blend).grid(row=0,column=0,columnspan=2)
                 self.control_blend_label = ttk.Label(self, text="")
                 self.control_blend_label.grid(row=0,column=2,columnspan=2)
@@ -950,7 +939,10 @@ class ReformInputFrame(ttk.Frame):
                 
                 groups = group_similar_results(results, (min_exempt+min_ne, max_exempt+max_ne))
                 self.results_frame.make_tree(groups, replace_by)
-                
+                print("Tree created, checking button states")
+                self.results_frame.check_button_states()
+                # self.results_frame.print_tree()
+
         def select_solvent_file(self):
                 self.main_input.select_solvent_file()
                 self.focus_force()
@@ -1009,14 +1001,25 @@ class ReformInputFrame(ttk.Frame):
                         a_c0 = np.array(list(selected_conc)+list(self.min_comp["Volume Fraction"]))
 
                 a_t, a_total_profile, a_partial_profiles, a_RED = get_evap_curve(a_c0, a_comp, target, temp_curve, t_span, self.main_input.all_solvents_df, replace_by == "Weight Fraction")
-                alternative_path = tk.filedialog.asksaveasfilename()
-
+                alternative_path = tk.filedialog.asksaveasfilename(defaultextension=".xlsx")
                 self.focus_force()
-                write_to_excel(alternative_path, selected_blend+list(self.min_comp["Name"]), a_t, a_total_profile, 
-                                a_partial_profiles, a_RED, temp_curve(a_t), target, temp_profile, temp_params, caption=replace_by)
+
+                if alternative_path:
+                        write_to_excel(alternative_path, selected_blend+list(self.min_comp["Name"]), a_t, a_total_profile, 
+                                        a_partial_profiles, a_RED, temp_curve(a_t), target, temp_profile, temp_params, caption=replace_by)
+                        print(f"Excel file saved successfully: {alternative_path}")
+                        self.open_file(alternative_path)
+
+        def open_file(self, filepath):
+                if platform.system() == 'Darwin':       # macOS
+                        subprocess.call(('open', filepath))
+                elif platform.system() == 'Windows':    # Windows
+                        os.startfile(filepath)
+                else:                                   # linux variants
+                        subprocess.call(('xdg-open', filepath))
                 
-                if alternative_path[-5:] != ".xlsx":
-                        alternative_path = alternative_path + ".xlsx"
+                # if alternative_path[-5:] != ".xlsx":
+                #         alternative_path = alternative_path + ".xlsx"
                 # # Open the file using the default application
                 # if sys.platform.startswith('darwin'):  # macOS
                 #         subprocess.call(('open', alternative_path))
@@ -1026,7 +1029,7 @@ class ReformInputFrame(ttk.Frame):
                 #         os.startfile(alternative_path)
                 # else:
                 #         print(f"File saved at: {alternative_path}")
-                os.startfile(alternative_path)
+                # # os.startfile(alternative_path)
                 
         def get_config(self):
                 return {"control_fname": self.control_fname,
@@ -1069,6 +1072,8 @@ class ReformResultsFrame(ttk.Frame):
                 self.display.bind("<<TreeviewSelect>>", self.update_selection)
                 self.export_button = ttk.Button(self, text="Export to Excel", state="disabled", style="big.TButton", command=self.export_output)
                 self.export_button.grid(row=2, column=0)
+                print("Export button created with initial state:", self.export_button.cget("state"))
+
                 self.compare_button = ttk.Button(self, text="Compare to Control", state="disabled", style="big.TButton", command=self.compare_to_control)
                 self.compare_button.grid(row=3,column=0)
 
@@ -1092,8 +1097,17 @@ class ReformResultsFrame(ttk.Frame):
                 except Exception as e:
                         print(f"Error in export_output: {str(e)}")
                         tk.messagebox.showerror("Export Error", f"An error occurred during export: {str(e)}")
-                
-        def update_selection(self, event):
+
+        def print_tree(self):
+                print("Tree structure:")
+                self._print_tree_helper(self.grouped_results, 0)
+
+        def _print_tree_helper(self, node, depth):
+                for key, value in node.items():
+                        print("  " * depth + str(key))
+                        if isinstance(value, dict):
+                                self._print_tree_helper(value, depth + 1)
+        def update_selection(self, _):
                 """
                 Updates which blend is currently selected.
                 Behavior:
@@ -1102,6 +1116,8 @@ class ReformResultsFrame(ttk.Frame):
                 - If the currently selected solvent has results, use the blend up to that point
                 - Otherwise, step down the tree (using the first child of each element) until we reach a blend with results. This will return the lowest cost blend that contains our selection.
                 """
+                self.compare_button.configure(state="normal")
+                self.export_button.configure(state="normal")
                 cur_id = self.display.selection()[0]
                 cur_item = self.display.item(cur_id)
                 names = []
@@ -1116,46 +1132,105 @@ class ReformResultsFrame(ttk.Frame):
                         if name == "Results":
                                 self.selected_blend = blend
                                 self.selected_conc = cur_reference["result"]["conc"]
-                                # Remove the reference to self.input_frame.replace_by
-                                self.compare_button.configure(state="normal")
-                                self.export_button.configure(state="normal")
                                 return
                         blend.append(name)
-                        if name in cur_reference:
-                                cur_reference = cur_reference[name]
-                        else:
-                                print(f"Warning: Unexpected tree structure. Name '{name}' not found in current reference.")
-                                return
-
-                # If we've reached this point, we haven't found a "Results" node
-                # We'll use the last valid blend we found
-                while cur_reference and "result" not in cur_reference:
-                        if not cur_reference:
-                                print("Warning: Reached end of tree without finding results.")
-                                return
-                        next_key = next(iter(cur_reference), None)
-                        if next_key is None:
-                                print("Warning: Empty dictionary encountered in tree.")
-                                return
+                        cur_reference = cur_reference[name]
+                while "result" not in cur_reference.keys():
+                        next_key = list(cur_reference.keys())[0]
                         blend.append(next_key)
                         cur_reference = cur_reference[next_key]
+                self.selected_blend = blend
+                self.selected_conc = cur_reference["result"]["conc"]
+ 
+                
+        # def update_selection(self, _):
+        #         print("Selection update triggered")
 
-                if "result" in cur_reference:
-                        self.selected_blend = blend
-                        self.selected_conc = cur_reference["result"]["conc"]
-                        # Remove the reference to self.input_frame.replace_by
-                        self.compare_button.configure(state="normal")
-                        self.export_button.configure(state="normal")
-                else:
-                        print("Warning: No results found for the selected item.")
+        #         """
+        #         Updates which blend is currently selected.
+        #         Behavior:
+
+        #         - If a "results" item or one of its children is selected, use that solvent blend
+        #         - If the currently selected solvent has results, use the blend up to that point
+        #         - Otherwise, step down the tree (using the first child of each element) until we reach a blend with results. This will return the lowest cost blend that contains our selection.
+        #         """
+        #         cur_id = self.display.selection()[0]
+        #         cur_item = self.display.item(cur_id)
+        #         names = []
+        #         while self.display.parent(cur_id) != "":
+        #                 names.append(cur_item["text"])
+        #                 cur_id = self.display.parent(cur_id)
+        #                 cur_item = self.display.item(cur_id)
+        #         names.append(cur_item["text"])
+        #         print("Selected items:", names)
+
+        #         cur_reference = self.grouped_results
+        #         blend = []
+        #         for name in names[::-1]:
+        #                 if name == "Results":
+        #                         self.selected_blend = blend
+        #                         self.selected_conc = cur_reference["result"]["conc"]
+        #                         # Remove the reference to self.input_frame.replace_by
+        #                         self.compare_button.configure(state="normal")
+        #                         self.export_button.configure(state="normal")
+        #                         return
+        #                 blend.append(name)
+        #                 if name in cur_reference:
+        #                         cur_reference = cur_reference[name]
+        #                 else:
+        #                         print(f"Warning: Unexpected tree structure. Name '{name}' not found in current reference.")
+        #                         return
+
+        #         # If we've reached this point, we haven't found a "Results" node
+        #         # We'll use the last valid blend we found
+        #         while cur_reference and "result" not in cur_reference:
+        #                 if not cur_reference:
+        #                         print("Warning: Reached end of tree without finding results.")
+        #                         return
+        #                 next_key = next(iter(cur_reference), None)
+        #                 if next_key is None:
+        #                         print("Warning: Empty dictionary encountered in tree.")
+        #                         return
+        #                 blend.append(next_key)
+        #                 cur_reference = cur_reference[next_key]
+
+        #         if "result" in cur_reference:
+        #                 self.selected_blend = blend
+        #                 self.selected_conc = cur_reference["result"]["conc"]
+        #                 # Remove the reference to self.input_frame.replace_by
+                        
+        #                 print("Setting buttons to normal state")
+        #                 self.compare_button.configure(state="normal")
+        #                 self.export_button.configure(state="normal")
+        #                 self.update_idletasks()
+        #                 print("Export button state after update:", self.export_button.cget("state"))
+        #                 print("Selected blend:", self.selected_blend)
+        #                 print("Selected concentrations:", self.selected_conc)
+
+        #         else:
+        #                 print("No results found, disabling buttons")
+        #                 self.compare_button.configure(state="disabled")
+        #                 self.export_button.configure(state="disabled")
+        #                 self.update_idletasks()
+                        # print("Export button state after update:", self.export_button.cget("state"))
+
+        def check_button_states(self):
+                print("Compare button state:", self.compare_button.cget("state"))
+                print("Export button state:", self.export_button.cget("state"))        
+
         def make_tree(self, grouped_results, replace_by):
                 self.grouped_results = grouped_results
                 self.replace_by = replace_by
+                self.compare_button.configure(state="disabled")
+                self.export_button.configure(state="disabled")
+
                 cur_iid = 0
                 cur_items = self.grouped_results.items()
                 while len(cur_items) > 0:
                         new_cur = []
                         for key, value in cur_items:
+                                # print(f"Inserting key: {key}: ")  # Debugging line
+
                                 if key == "result":
                                         self.display.insert(value.get("parent"), tk.END, iid=cur_iid, text="Results")
                                         self.display.insert(cur_iid, tk.END, cur_iid + 1, text=f"Cost: {value['cost']}")
@@ -1169,6 +1244,28 @@ class ReformResultsFrame(ttk.Frame):
                                                         new_cur.append(subtree)
                                         cur_iid += 1
                         cur_items = new_cur
+
+                        # self.check_button_states()
+                        # print("Tree created, checking if any results exist")
+                        # if any("result" in group for group in self.grouped_results.values()):
+                        #         print("Results exist, enabling buttons")
+                        #         self.compare_button.configure(state="normal")
+                        #         self.export_button.configure(state="normal")
+                        # else:
+                        #         print("No results found, buttons remain disabled")
+                        # self.update_idletasks()
+                        # self.check_button_states()
+                        
+                        # Enable buttons after creating the tree
+                        self.compare_button.configure(state="normal")
+                        self.export_button.configure(state="normal") 
+        def enable_buttons(self):
+                print("Manually enabling buttons")
+                self.compare_button.configure(state="normal")
+                self.export_button.configure(state="normal")
+                self.update_idletasks()
+                self.check_button_states()
+
         def clear(self):
                 self.display.destroy()
                 self.selected_blend = None
@@ -1181,7 +1278,18 @@ class ReformResultsFrame(ttk.Frame):
                 self.display.grid(row=1, column=0)
                 self.display.bind("<<TreeviewSelect>>", self.update_selection)
         
-                
+        def force_button_update(self):
+                print("Forcing button update")
+                if hasattr(self, 'selected_blend') and self.selected_blend:
+                        print("Selected blend exists, enabling buttons")
+                        self.compare_button.configure(state="normal")
+                        self.export_button.configure(state="normal")
+                else:
+                        print("No selected blend, disabling buttons")
+                        self.compare_button.configure(state="disabled")
+                        self.export_button.configure(state="disabled")
+                self.update_idletasks()
+                self.check_button_states()      
                 
 class GraphFrame(ttk.Frame):
         """
@@ -1230,7 +1338,31 @@ import logging
 
 # logging.basicConfig(level=logging.DEBUG)
 
-
+# if __name__ == "__main__":
+#         root = tk.Tk()
+#         root.wm_title("Extended Evaporation Simulator")
+#         compare_screen = tk.Toplevel(root)
+#         compare_screen.wm_title("Evaporation Simulator Comparison Tool")
+#         compare_graph = GraphFrame(compare_screen)
+#         compare_input = CompareInputFrame(compare_screen, compare_graph)
+#         compare_input.grid(row=0, column=0, sticky="N")
+#         compare_graph.grid(row=0, column=1)
+#         compare_screen.withdraw()
+#         compare_screen.protocol("WM_DELETE_WINDOW", compare_screen.withdraw)
+#         reform_screen = tk.Toplevel(root)
+#         reform_results = ReformResultsFrame(reform_screen)
+#         reform_results.grid(row=0,column=1)
+#         reform_input = ReformInputFrame(reform_screen, compare_screen, compare_input, reform_results)
+#         reform_input.grid(row=0,column=0)
+#         reform_results.set_input_frame(reform_input)
+#         reform_screen.withdraw()
+#         reform_screen.protocol("WM_DELETE_WINDOW", reform_screen.withdraw)
+        
+#         graph_frame = GraphFrame(root)
+#         input_frame = MainInputFrame(root, graph_frame, compare_input, compare_screen, reform_input, reform_screen)
+#         input_frame.grid(column=0,row=0, sticky="N")
+#         graph_frame.grid(column=1,row=0)
+#         root.mainloop()
 
 
 
