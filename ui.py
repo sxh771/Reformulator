@@ -829,9 +829,9 @@ class ReformInputFrame(ttk.Frame):
                 """
                 Gathers inputs, checks them, and then calls :func:`get_alternative_blends`
                 """
-                self.results_frame.clear()
+                self.results_frame.clear()              # Clears the Alternative Blends Treeview Frame
                 try:
-                        min_exempt = int(self.solvent_nums["min_exempt"].get())
+                        min_exempt = int(self.solvent_nums["min_exempt"].get())         # Gathers the number of exempt and non-exempt solvents specified by user
                         max_exempt = int(self.solvent_nums["max_exempt"].get())
                         min_ne = int(self.solvent_nums["min_ne"].get())
                         max_ne = int(self.solvent_nums["max_ne"].get())
@@ -854,8 +854,8 @@ class ReformInputFrame(ttk.Frame):
                         tk.messagebox.showwarning(title="Invalid Input", message=f"Error in max VOC: {str(e)}\nPlease enter a decimal number between 0 and 100 for max VOC.")
                         self.focus_force()
                         return
-                target_params = self.target_frame.get_params()
-                temp_profile = self.temp_frame.get_temp_profile()
+                target_params = self.target_frame.get_params()          # Get Target parameters from user input
+                temp_profile = self.temp_frame.get_temp_profile()       # Get Temperature parameters from user input
                 if target_params is None or temp_profile is None:
                         return
                 if self.main_input.all_solvents_df is None:
@@ -863,7 +863,7 @@ class ReformInputFrame(ttk.Frame):
                         self.focus_force()
                         return
                 if self.using_whitelist:
-                        missing_solvents = []
+                        missing_solvents = []           # missing_solvents tracks what whitelist solvents are not in solvent database for error message
                         for solvent in self.whitelist:
                                 if solvent not in self.main_input.all_solvents_df.index:
                                         missing_solvents.append(str(solvent))
@@ -872,7 +872,7 @@ class ReformInputFrame(ttk.Frame):
                                 self.focus_force()
                                 return
                 elif self.blacklist is not None:
-                        missing_solvents = []
+                        missing_solvents = []           # tracks what blacklist solvents are not in solvent database ## Would this even cause an issue?
                         for solvent in self.blacklist:
                                 if solvent not in self.main_input.all_solvents_df.index:
                                         missing_solvents.append(str(solvent))
@@ -881,8 +881,8 @@ class ReformInputFrame(ttk.Frame):
                                 self.focus_force()
                                 return
 
-                replace_by = "Volume Fraction" if "Volume Fraction" in self.min_comp.columns else "Weight Fraction"
-                missing_solvents = []
+                replace_by = "Volume Fraction" if "Volume Fraction" in self.min_comp.columns else "Weight Fraction"            # Converts betweeen Volume and Weight Fraction
+                missing_solvents = []                   # tracks what min_comp solvents are not in the database
                 for solvent in self.min_comp["Name"]:
                         if solvent not in self.main_input.all_solvents_df.index:
                                 missing_solvents.append(str(solvent))
@@ -897,14 +897,14 @@ class ReformInputFrame(ttk.Frame):
 
                 try:
                         formulation_density = float(self.density_entry.get())
-                        if self.density_units.get() == "g/L":
+                        if self.density_units.get() == "g/L":                   # Convert density from g/L to lb/gal
                                 formulation_density *= 0.0083
                 except ValueError:
                         tk.messagebox.showwarning(title="Invalid Input", message="Please enter a valid decimal number for formulation density (or 0 if unknown).")
                         self.focus_force()
                         return
 
-                control_solvents = pd.DataFrame([self.main_input.all_solvents_df.loc[n,:] for n in self.control_blend["Name"]])
+                control_solvents = pd.DataFrame([self.main_input.all_solvents_df.loc[n,:] for n in self.control_blend["Name"]])         # Gather info for solvents in control
                 try:
                         if "Volume Fraction" not in self.control_blend.columns:
                                 self.control_blend["Volume Fraction"] = self.control_blend["Weight Fraction"] / np.array(control_solvents["Density"])
@@ -933,12 +933,14 @@ class ReformInputFrame(ttk.Frame):
                         self.focus_force()
                         return
                 
+                # Does the processing of the reformulator window
                 results = get_alternative_blends(self.main_input.all_solvents_df, self.control_blend, self.min_comp, replace_by, target_params,
                                                  temp_profile, (min_exempt, max_exempt), (min_ne, max_ne), (max_voc, VOC_limit_type), formulation_density,
                                                  self.whitelist if self.using_whitelist else None, self.blacklist if not self.using_whitelist else None)
                 
+                # Cleans up the results of get_alternative_blends
                 groups = group_similar_results(results, (min_exempt+min_ne, max_exempt+max_ne))
-                self.results_frame.make_tree(groups, replace_by)
+                self.results_frame.make_tree(groups, replace_by)        # This is what creates the data in the display
                 print("Tree created, checking button states")
                 self.results_frame.check_button_states()
                 # self.results_frame.print_tree()
