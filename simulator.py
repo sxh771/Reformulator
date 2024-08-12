@@ -288,9 +288,10 @@ def get_alternative_blends(all_solvents, control_blend, min_comp, replace_by, ta
                         mc_voc = sum([r[replace_by]*all_solvents["Density"][r["Name"]] if all_solvents["Exempt"][r["Name"]] else 0 for _, r in min_comp.iterrows()]) * solvent_wpg
         """
         results = []
-        for ge in good_exempt[:min(max(len(good_exempt)//2,3), len(good_exempt))]:
+        results_2 = []
+        for ge_index, ge in enumerate(good_exempt[:min(max(len(good_exempt)//2,3), len(good_exempt))]):
                 e = ge["blend"]
-                for n in ne_blends:
+                for n_index, n in enumerate(ne_blends):
                         full_blend = list(e) + list(n)
                         entire_blend = full_blend + [all_solvents.loc[n,:] for n in min_comp["Name"]]
                         sum_constraint = LinearConstraint(np.ones(len(full_blend)-1), ub=(1-mc_tot-0.01)+1e-10)
@@ -308,12 +309,23 @@ def get_alternative_blends(all_solvents, control_blend, min_comp, replace_by, ta
                                        bounds = [(0.01, 1-mc_tot)]*len(e) + [(0.01, max_voc)] * (len(n)-1), constraints = [sum_constraint, exempt_constraint])
                         if res.success:
                                 conc = list(res.x) + [1-sum(res.x)-mc_tot]
+
                                 results.append({"blend":full_blend, 
                                         "conc": conc,
                                         "num_exempt": len(e),
                                         "order": [full_blend[conc.index(x)] for x in sorted(conc, key=lambda x:-x)],
                                         "cost":total_cost(all_solvents, list(res.x) + [1-mc_tot-sum(res.x)] + list(min_comp[replace_by]), entire_blend, control_estimate, target, temp_curve, len(e), max_voc, True, True),
                                         })
+                                
+                                # Like the results list, but now the "blend" contains a dictionary of solvents and their concentrations
+                                results_2.append({"blend": 
+                                        {[full_blend[conc.index(x)] for x in sorted(conc, key=lambda x:-x)][i].name : conc[i] for i in range(len(conc))},
+                                        "cost":total_cost(all_solvents, list(res.x) + [1-mc_tot-sum(res.x)] + list(min_comp[replace_by]), entire_blend, control_estimate, target, temp_curve, len(e), max_voc, True, True),
+                                        "num_exempt":len(e)
+                                        })
+                                
+        sorted_results_2 = sorted(results_2, key=lambda x:x["cost"])
+        #print(sorted_results_2)
         sorted_results = sorted(results, key=lambda x:x["cost"])
         return list(filter(lambda x: x["cost"] <= sorted_results[0]["cost"] * 2, sorted_results))
                 
