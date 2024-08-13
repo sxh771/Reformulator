@@ -327,7 +327,7 @@ def get_alternative_blends(all_solvents, control_blend, min_comp, replace_by, ta
         sorted_results_2 = sorted(results_2, key=lambda x:x["cost"])
         #print(sorted_results_2)
         sorted_results = sorted(results, key=lambda x:x["cost"])
-        return list(filter(lambda x: x["cost"] <= sorted_results[0]["cost"] * 2, sorted_results))
+        return list(filter(lambda x: x["cost"] <= sorted_results_2[0]["cost"] * 2, sorted_results_2))
                 
 
 

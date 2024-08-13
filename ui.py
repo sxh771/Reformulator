@@ -939,8 +939,10 @@ class ReformInputFrame(ttk.Frame):
                                                  self.whitelist if self.using_whitelist else None, self.blacklist if not self.using_whitelist else None)
                 
                 # Cleans up the results of get_alternative_blends
-                groups = group_similar_results(results, (min_exempt+min_ne, max_exempt+max_ne))
-                self.results_frame.make_tree(groups, replace_by)        # This is what creates the data in the display
+                # groups = group_similar_results(results, (min_exempt+min_ne, max_exempt+max_ne))
+                headers, data = group_similar_results_2(results)
+                self.results_frame.make_table(headers, data)
+                #self.results_frame.make_tree(groups, replace_by)        # This is what creates the data in the display
                 print("Tree created, checking button states")
                 self.results_frame.check_button_states()
                 # self.results_frame.print_tree()
@@ -1068,8 +1070,9 @@ class ReformResultsFrame(ttk.Frame):
                 self.big_style.configure("big.TLabel", font=('Arial',14))
                 self.big_style.configure("big.TButton", font=('Arial',14))
                 ttk.Label(self, text="Alternative Blends", style="big.TLabel").grid(row=0,column=0)
-                self.display = ttk.Treeview(self, show='tree')
-                self.display.column('#0', width=500)
+                #self.display = ttk.Treeview(self, show='tree')
+                self.display = ttk.Treeview(self, show= "headings")
+                #self.display.column('#0', width=500)
                 self.display.grid(row=1, column=0)
                 self.display.bind("<<TreeviewSelect>>", self.update_selection)
                 self.export_button = ttk.Button(self, text="Export to Excel", state="disabled", style="big.TButton", command=self.export_output)
@@ -1220,6 +1223,26 @@ class ReformResultsFrame(ttk.Frame):
                 print("Compare button state:", self.compare_button.cget("state"))
                 print("Export button state:", self.export_button.cget("state"))        
 
+        def make_table(self, header_list, data_list):
+                self.header_list = header_list
+                self.data_list = data_list
+                self.compare_button.configure(state="disabled")
+                self.export_button.configure(state="disabled")
+                
+                self.display["columns"] = self.header_list
+
+                for i in range(len(self.data_list)):
+                        self.display.insert(parent= "", index= tk.END, values= self.data_list[i])
+                
+                for index, item in enumerate(self.header_list):
+                        print(item)
+                        self.display.heading(item, text= item, anchor= tk.CENTER)
+                        self.display.column(index, anchor= tk.CENTER, width= 100, minwidth= 50)
+        
+        def create_headers(self, header_list):
+                self.header_list = header_list
+                self.display["columns"] = header_list
+
         def make_tree(self, grouped_results, replace_by):
                 self.grouped_results = grouped_results
                 self.replace_by = replace_by
@@ -1275,8 +1298,8 @@ class ReformResultsFrame(ttk.Frame):
                 self.compare_button.configure(state="disabled")
                 self.export_button.configure(state="disabled")
                 self.grouped_results = None
-                self.display = ttk.Treeview(self, show='tree')
-                self.display.column('#0', width=500)
+                self.display = ttk.Treeview(self, show='headings')
+                #self.display.column('#0', width=500)
                 self.display.grid(row=1, column=0)
                 self.display.bind("<<TreeviewSelect>>", self.update_selection)
         
@@ -1396,6 +1419,8 @@ if __name__ == "__main__":
 
     reform_results = ReformResultsFrame(reform_screen)
     reform_input = ReformInputFrame(reform_screen, compare_screen, compare_input, reform_results)
+    if hasattr(reform_input,'headers'):
+        reform_results.create_headers(reform_results.header_list)
 
 # Use grid with sticky option to make frames expand
     reform_input.grid(row=0, column=0, sticky="NSEW")
