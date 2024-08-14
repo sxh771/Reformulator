@@ -942,7 +942,7 @@ class ReformInputFrame(ttk.Frame):
                 # groups = group_similar_results(results, (min_exempt+min_ne, max_exempt+max_ne))
                 headers, data = group_similar_results_2(results)
                 self.results_frame.make_table(headers, data)
-                #self.results_frame.make_tree(groups, replace_by)        # This is what creates the data in the display
+                #self.results_frame.make_tree(groups, replace_by)        # This is what creates the data in the old display
                 print("Tree created, checking button states")
                 self.results_frame.check_button_states()
                 # self.results_frame.print_tree()
@@ -1062,7 +1062,7 @@ class ReformResultsFrame(ttk.Frame):
         """
         Displays results (found alternative blends) and facilitates exporting data/comparison to control for them.
         """
-        def __init__(self, root):
+        def __init__(self, root):       # __init__ is called when window is first opened. Overwritten by clear() in find_blends
                 super().__init__(root)
                 # self.columnconfigure(0, weight=1)
                 # self.rowconfigure(0, weight=1)
@@ -1070,9 +1070,8 @@ class ReformResultsFrame(ttk.Frame):
                 self.big_style.configure("big.TLabel", font=('Arial',14))
                 self.big_style.configure("big.TButton", font=('Arial',14))
                 ttk.Label(self, text="Alternative Blends", style="big.TLabel").grid(row=0,column=0)
-                #self.display = ttk.Treeview(self, show='tree')
-                self.display = ttk.Treeview(self, show= "headings")
-                #self.display.column('#0', width=500)
+                self.display = ttk.Treeview(self, show='tree')  # Set inital display before table is made
+                self.display.column('#0', width=500)
                 self.display.grid(row=1, column=0)
                 self.display.bind("<<TreeviewSelect>>", self.update_selection)
                 self.export_button = ttk.Button(self, text="Export to Excel", state="disabled", style="big.TButton", command=self.export_output)
@@ -1224,9 +1223,12 @@ class ReformResultsFrame(ttk.Frame):
                 print("Export button state:", self.export_button.cget("state"))        
 
         def make_table(self, header_list, data_list):
+                """
+                Adds entries and headers to table from group_similar_results
+                """
                 self.header_list = header_list
                 self.data_list = data_list
-                self.compare_button.configure(state="disabled")
+                self.compare_button.configure(state="disabled") # Disable buttons while table creation is in progress
                 self.export_button.configure(state="disabled")
                 
                 self.display["columns"] = self.header_list
@@ -1235,15 +1237,15 @@ class ReformResultsFrame(ttk.Frame):
                         self.display.insert(parent= "", index= tk.END, values= self.data_list[i])
                 
                 for index, item in enumerate(self.header_list):
-                        print(item)
                         self.display.heading(item, text= item, anchor= tk.CENTER)
-                        self.display.column(index, anchor= tk.CENTER, width= 100, minwidth= 50)
-        
-        def create_headers(self, header_list):
-                self.header_list = header_list
-                self.display["columns"] = header_list
+                        self.display.column(index, anchor= tk.CENTER, width= 60, minwidth= 25)  # width and minwidth change the starting and minimum size of the columns, respectively
+                
+                self.compare_button.configure(state="normal")   # Re-enable buttons after
+                self.export_button.configure(state="normal")
+                
 
-        def make_tree(self, grouped_results, replace_by):
+
+        '''def make_tree(self, grouped_results, replace_by):
                 self.grouped_results = grouped_results
                 self.replace_by = replace_by
                 self.compare_button.configure(state="disabled")
@@ -1283,7 +1285,7 @@ class ReformResultsFrame(ttk.Frame):
                         
                         # Enable buttons after creating the tree
                         self.compare_button.configure(state="normal")
-                        self.export_button.configure(state="normal") 
+                        self.export_button.configure(state="normal")''' 
         def enable_buttons(self):
                 print("Manually enabling buttons")
                 self.compare_button.configure(state="normal")
@@ -1298,8 +1300,7 @@ class ReformResultsFrame(ttk.Frame):
                 self.compare_button.configure(state="disabled")
                 self.export_button.configure(state="disabled")
                 self.grouped_results = None
-                self.display = ttk.Treeview(self, show='headings')
-                #self.display.column('#0', width=500)
+                self.display = ttk.Treeview(self, show='headings', height= 20)
                 self.display.grid(row=1, column=0)
                 self.display.bind("<<TreeviewSelect>>", self.update_selection)
         
@@ -1419,8 +1420,6 @@ if __name__ == "__main__":
 
     reform_results = ReformResultsFrame(reform_screen)
     reform_input = ReformInputFrame(reform_screen, compare_screen, compare_input, reform_results)
-    if hasattr(reform_input,'headers'):
-        reform_results.create_headers(reform_results.header_list)
 
 # Use grid with sticky option to make frames expand
     reform_input.grid(row=0, column=0, sticky="NSEW")

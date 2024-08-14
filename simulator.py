@@ -270,7 +270,7 @@ def get_alternative_blends(all_solvents, control_blend, min_comp, replace_by, ta
                                         })
         good_exempt = sorted(exempt_results, key=lambda x: x["cost"])
 
-        #Step 2 - Use good exempt blends to create ful solvent blend
+        #Step 2 - Use good exempt blends to create full solvent blend
         
         ne_blends = list(itertools.chain.from_iterable([list(itertools.combinations(ne_solvents, n)) for n in range(min_ne, max_ne + 1)]))
         mc_tot = sum(min_comp[replace_by])
@@ -287,11 +287,11 @@ def get_alternative_blends(all_solvents, control_blend, min_comp, replace_by, ta
                 else:
                         mc_voc = sum([r[replace_by]*all_solvents["Density"][r["Name"]] if all_solvents["Exempt"][r["Name"]] else 0 for _, r in min_comp.iterrows()]) * solvent_wpg
         """
-        results = []
+        #results = []
         results_2 = []
-        for ge_index, ge in enumerate(good_exempt[:min(max(len(good_exempt)//2,3), len(good_exempt))]):
+        for ge in good_exempt[:min(max(len(good_exempt)//2,3), len(good_exempt))]:
                 e = ge["blend"]
-                for n_index, n in enumerate(ne_blends):
+                for n in ne_blends:
                         full_blend = list(e) + list(n)
                         entire_blend = full_blend + [all_solvents.loc[n,:] for n in min_comp["Name"]]
                         sum_constraint = LinearConstraint(np.ones(len(full_blend)-1), ub=(1-mc_tot-0.01)+1e-10)
@@ -310,29 +310,28 @@ def get_alternative_blends(all_solvents, control_blend, min_comp, replace_by, ta
                         if res.success:
                                 conc = list(res.x) + [1-sum(res.x)-mc_tot]
                                 weighted_conc = list(np.round([i/sum(conc) for i in conc],3))           # Adding the method of weighting to avoid min_comp a bit earlier than before
-                                results.append({"blend":full_blend, 
+                                '''results.append({"blend":full_blend, 
                                         "conc": conc,
                                         "num_exempt": len(e),
                                         "order": [full_blend[conc.index(x)] for x in sorted(conc, key=lambda x:-x)],
                                         "cost":total_cost(all_solvents, list(res.x) + [1-mc_tot-sum(res.x)] + list(min_comp[replace_by]), entire_blend, control_estimate, target, temp_curve, len(e), max_voc, True, True),
-                                        })
+                                        })'''
                                 
                                 # Like the results list, but now the "blend" contains a dictionary of solvents and their concentrations
                                 results_2.append({"blend": 
                                         {[full_blend[conc.index(x)] for x in sorted(conc, key=lambda x:-x)][i].name : weighted_conc[i] for i in range(len(weighted_conc))},
-                                        "cost":total_cost(all_solvents, list(res.x) + [1-mc_tot-sum(res.x)] + list(min_comp[replace_by]), entire_blend, control_estimate, target, temp_curve, len(e), max_voc, True, True),
+                                        "cost":round(total_cost(all_solvents, list(res.x) + [1-mc_tot-sum(res.x)] + list(min_comp[replace_by]), entire_blend, control_estimate, target, temp_curve, len(e), max_voc, True, True),3),
                                         "num_exempt":len(e)
                                         })
                                 
         sorted_results_2 = sorted(results_2, key=lambda x:x["cost"])
-        #print(sorted_results_2)
-        sorted_results = sorted(results, key=lambda x:x["cost"])
+        #sorted_results = sorted(results, key=lambda x:x["cost"])
         return list(filter(lambda x: x["cost"] <= sorted_results_2[0]["cost"] * 2, sorted_results_2))
                 
 
 
 
-def group_similar_results(results, num_solvents):
+'''def group_similar_results(results, num_solvents):
         """
         Creates a nested dictionary of results in the same format as is displayed in the "Alternative Blends" tab of the reformulation window
 
@@ -360,7 +359,7 @@ def group_similar_results(results, num_solvents):
                                 fewer_better = True
                         if not fewer_better:
                                 current_level[r["order"][-1].name] = {"result": r}
-        return grouped_results
+        return grouped_results'''
 
 def group_similar_results_2(results):
         """
@@ -392,7 +391,7 @@ def group_similar_results_2(results):
                         data[i].append('')                    # Populating the table with blanks
 
         for i, item in enumerate(results):
-                data[i][0] = f'Blend #{i}'              # Insert first column as blend number
+                data[i][0] = f'Blend #{i+1}'            # Insert first column as blend number
                 data[i][1] = item['cost']               # Insert second column as cost ranking
                 for j, solvent in enumerate(headers):
                         if solvent in item['blend']:
