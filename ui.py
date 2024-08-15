@@ -1083,6 +1083,7 @@ class ReformResultsFrame(ttk.Frame):
                 self.display.column('#0', width=500)
                 self.display.grid(row=1, column=0)
                 self.display.bind("<<TreeviewSelect>>", self.update_selection)
+                #self.display.tag_configure('shaded', background= 'lightblue')
                 self.export_button = ttk.Button(self, text="Export to Excel", state="disabled", style="big.TButton", command=self.export_output)
                 self.export_button.grid(row=2, column=0)
                 print("Export button created with initial state:", self.export_button.cget("state"))
@@ -1243,7 +1244,10 @@ class ReformResultsFrame(ttk.Frame):
                 self.display["columns"] = self.header_list
 
                 for i in range(len(self.data_list)):
-                        self.display.insert(parent= "", index= tk.END, values= self.data_list[i])
+                        if i%2 == 0:
+                                self.display.insert(parent= "", index= tk.END, values= self.data_list[i], tags= 'shaded')
+                        else:
+                                self.display.insert(parent= "", index= tk.END, values= self.data_list[i])
                 
                 for index, item in enumerate(self.header_list):
                         self.display.heading(item, text= item, anchor= tk.CENTER)
@@ -1312,6 +1316,7 @@ class ReformResultsFrame(ttk.Frame):
                 self.display = ttk.Treeview(self, show='headings')
                 self.display.grid(row=1, column=0)
                 self.display.bind("<<TreeviewSelect>>", self.update_selection)
+                self.display.tag_configure('shaded', background= 'lightgray')
         
         def force_button_update(self):
                 print("Forcing button update")
