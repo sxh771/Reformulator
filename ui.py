@@ -712,7 +712,10 @@ class ReformInputFrame(ttk.Frame):
                 ttk.Label(self, text="Total Time (min): ").grid(row=10,column=0)
                 self.total_time = ttk.Entry(self)
                 self.total_time.grid(row=10,column=1)
-                ttk.Button(self, text="Find Solvent Blends", style="big.TButton", command=self.find_blends).grid(row=11, column=0, columnspan=2)
+                ttk.Label(self, text="# Blends in Results: ").grid(row=11,column=0)
+                self.num_results = ttk.Entry(self)
+                self.num_results.grid(row=11, column=1)
+                ttk.Button(self, text="Find Solvent Blends", style="big.TButton", command=self.find_blends).grid(row=12, column=0, columnspan=2)
                 self.control_fname = ""
                 self.mc_fname = ""
                 self.wl_bl_fname = ""
@@ -933,9 +936,15 @@ class ReformInputFrame(ttk.Frame):
                         self.focus_force()
                         return
                 
+                try:
+                        num_results = int(self.num_results.get())
+                except TypeError:
+                        tk.messagebox.showwarning(title="Invalid Input", message="# Blends in Results must be an integer")
+                except ValueError: 
+                        num_results = 10        # If no value is entered, display 10 results as the default
                 # Does the processing of the reformulator window
                 results = get_alternative_blends(self.main_input.all_solvents_df, self.control_blend, self.min_comp, replace_by, target_params,
-                                                 temp_profile, (min_exempt, max_exempt), (min_ne, max_ne), (max_voc, VOC_limit_type), formulation_density,
+                                                 temp_profile, (min_exempt, max_exempt), (min_ne, max_ne), (max_voc, VOC_limit_type), formulation_density, num_results,
                                                  self.whitelist if self.using_whitelist else None, self.blacklist if not self.using_whitelist else None)
                 
                 # Cleans up the results of get_alternative_blends
@@ -1300,7 +1309,7 @@ class ReformResultsFrame(ttk.Frame):
                 self.compare_button.configure(state="disabled")
                 self.export_button.configure(state="disabled")
                 self.grouped_results = None
-                self.display = ttk.Treeview(self, show='headings', height= 20)
+                self.display = ttk.Treeview(self, show='headings')
                 self.display.grid(row=1, column=0)
                 self.display.bind("<<TreeviewSelect>>", self.update_selection)
         

@@ -215,7 +215,7 @@ def total_cost(all_solvents, conc, blend, control_params, target, temp_curve, nu
                 voc_cost = (ratio - 0.9) ** 2 * 100 # Typical cost: 0-1
         return hansen_cost + evap_cost + voc_cost
 
-def get_alternative_blends(all_solvents, control_blend, min_comp, replace_by, target, temp_curve, exempt_range, ne_range, voc_limit, control_density, whitelist = None, blacklist = None):
+def get_alternative_blends(all_solvents, control_blend, min_comp, replace_by, target, temp_curve, exempt_range, ne_range, voc_limit, control_density, num_results, whitelist = None, blacklist = None):
         """
         Finds the best alternative blends (ranked by total cost) for a given control
 
@@ -326,7 +326,11 @@ def get_alternative_blends(all_solvents, control_blend, min_comp, replace_by, ta
                                 
         sorted_results_2 = sorted(results_2, key=lambda x:x["cost"])
         #sorted_results = sorted(results, key=lambda x:x["cost"])
-        return list(filter(lambda x: x["cost"] <= sorted_results_2[0]["cost"] * 2, sorted_results_2))
+        if len(sorted_results_2) < num_results or num_results <= 0:
+                num_results = len(sorted_results_2)
+        trimmed_results = [sorted_results_2[i] for i in range(num_results)]
+        #return list(filter(lambda x: x["cost"] <= sorted_results_2[0]["cost"] * 2, sorted_results_2))
+        return trimmed_results
                 
 
 
