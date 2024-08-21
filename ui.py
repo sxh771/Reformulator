@@ -712,7 +712,7 @@ class ReformInputFrame(ttk.Frame):
                 ttk.Label(self, text="Total Time (min): ").grid(row=10,column=0)
                 self.total_time = ttk.Entry(self)
                 self.total_time.grid(row=10,column=1)
-                ttk.Label(self, text="# Blends in Results: ").grid(row=11,column=0)
+                ttk.Label(self, text="# Blends to display: ").grid(row=11,column=0)
                 self.num_results = ttk.Entry(self)
                 self.num_results.grid(row=11, column=1)
                 ttk.Button(self, text="Find Solvent Blends", style="big.TButton", command=self.find_blends).grid(row=12, column=0, columnspan=2)
@@ -942,6 +942,7 @@ class ReformInputFrame(ttk.Frame):
                         tk.messagebox.showwarning(title="Invalid Input", message="# Blends in Results must be an integer")
                 except ValueError: 
                         num_results = 10        # If no value is entered, display 10 results as the default
+                
                 # Does the processing of the reformulator window
                 results = get_alternative_blends(self.main_input.all_solvents_df, self.control_blend, self.min_comp, replace_by, target_params,
                                                  temp_profile, (min_exempt, max_exempt), (min_ne, max_ne), (max_voc, VOC_limit_type), formulation_density, num_results,
@@ -949,8 +950,8 @@ class ReformInputFrame(ttk.Frame):
                 
                 # Cleans up the results of get_alternative_blends
                 # groups = group_similar_results(results, (min_exempt+min_ne, max_exempt+max_ne))
-                headers, data = group_similar_results_2(results)
-                self.results_frame.make_table(headers, data)
+                self.headers, self.data = group_similar_results_2(results)
+                self.results_frame.make_table(self.headers, self.data, replace_by)
                 #self.results_frame.make_tree(groups, replace_by)        # This is what creates the data in the old display
                 print("Tree created, checking button states")
                 self.results_frame.check_button_states()
@@ -1121,7 +1122,33 @@ class ReformResultsFrame(ttk.Frame):
                         print("  " * depth + str(key))
                         if isinstance(value, dict):
                                 self._print_tree_helper(value, depth + 1)
+
         def update_selection(self, _):
+                """
+                Updates which blend is currently selected in Alternative Blends table
+                
+                Behavior:
+                - Take the information in the selected row and remove the "Blend" and "Cost" columns
+                - Search through each remaining column and add solvent to selected_blend and concentration to selected_conc if the concentration is not zero
+                """
+                self.compare_button.configure(state="normal")
+                self.export_button.configure(state="normal")
+                cur_id = self.display.selection()[0]
+                cur_item = self.display.set(cur_id)             # cur_item is dictionary of {header: value} for each column in the row
+
+                blend_no = cur_item.pop("Blend")                # Removes blend from cur_item and stores blend number as blend_no
+                cur_cost = cur_item.pop("Cost")                 # Removes cost from cur_item and stores it as cur_cost
+                self.selected_blend = []
+                self.selected_conc = []
+
+                for item in cur_item.items():
+                        if item[1] != "":
+                                self.selected_blend.append(item[0])
+                                self.selected_conc.append(float(item[1]))
+                
+                #print(f"cur_item: {cur_item}")         # De-bugging to show what update_selection is currently reading
+
+        '''def update_selection(self, _):               # Old way of updating selection for branched Treeview
                 """
                 Updates which blend is currently selected.
                 Behavior:
@@ -1154,8 +1181,7 @@ class ReformResultsFrame(ttk.Frame):
                         blend.append(next_key)
                         cur_reference = cur_reference[next_key]
                 self.selected_blend = blend
-                self.selected_conc = cur_reference["result"]["conc"]
- 
+                self.selected_conc = cur_reference["result"]["conc"]'''
                 
         # def update_selection(self, _):
         #         print("Selection update triggered")
@@ -1232,12 +1258,13 @@ class ReformResultsFrame(ttk.Frame):
                 print("Compare button state:", self.compare_button.cget("state"))
                 print("Export button state:", self.export_button.cget("state"))        
 
-        def make_table(self, header_list, data_list):
+        def make_table(self, header_list, data_list, replace_by):
                 """
                 Adds entries and headers to table from group_similar_results
                 """
                 self.header_list = header_list
                 self.data_list = data_list
+                self.replace_by = replace_by
                 self.compare_button.configure(state="disabled") # Disable buttons while table creation is in progress
                 self.export_button.configure(state="disabled")
                 
@@ -1437,7 +1464,7 @@ if __name__ == "__main__":
 
 # Use grid with sticky option to make frames expand
     reform_input.grid(row=0, column=0, sticky="NSEW")
-    reform_results.grid(row=0, column=1, sticky="NSEW")
+    reform_results.grid(row=0, column=1, sticky="NSEW", padx=50)
 
     reform_results.set_input_frame(reform_input)
     reform_screen.withdraw()
