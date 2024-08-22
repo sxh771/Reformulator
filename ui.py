@@ -961,7 +961,7 @@ class ReformInputFrame(ttk.Frame):
                 self.main_input.select_solvent_file()
                 self.focus_force()
 
-        def compare_to_control(self, selected_blend, selected_conc, replace_by):
+        def compare_to_control(self, selected_blends, selected_concs, blend_nos, replace_by):
                 """
                 Opens the currently selected blend alongside the control blend in the "Compare" window
 
@@ -969,22 +969,6 @@ class ReformInputFrame(ttk.Frame):
                         selected_conc: Initial concentration of solvents in selected blend (weight %)
                         selected_blend: A list of pandas DataFrame rows containing information about the solvents in the selected blend  
                 """
-                #Get evaporation data for selected & control blends
-                c_comp = [self.main_input.all_solvents_df.loc[name,:] for name in self.control_blend["Name"]]
-                c_c0 = self.control_blend["Volume Fraction"]/sum(self.control_blend["Volume Fraction"])
-                t_span = [0, float(self.total_time.get())]
-                target = self.target_frame.get_params()
-                temp_curve = self.temp_frame.get_temp_profile()
-                c_t, c_total_profile, c_partial_profiles, c_RED = get_evap_curve(c_c0, c_comp, target, temp_curve, t_span, self.main_input.all_solvents_df, replace_by == "Weight Fraction")
-                a_comp = [self.main_input.all_solvents_df.loc[name,:] for name in selected_blend] + [self.main_input.all_solvents_df.loc[name,:] for name in self.min_comp["Name"]]
-                if replace_by == "Weight Fraction":
-                        a_wf = np.array(list(selected_conc)+list(self.min_comp["Weight Fraction"]))
-                        a_c0 = a_wf * np.array(pd.DataFrame(a_comp)["Density"])
-                        a_c0 /= sum(a_c0)
-                else:
-                        a_c0 = np.array(list(selected_conc)+list(self.min_comp["Volume Fraction"]))
-                a_t, a_total_profile, a_partial_profiles, a_RED = get_evap_curve(a_c0, a_comp, target, temp_curve, t_span, self.main_input.all_solvents_df, replace_by == "Weight Fraction")
-
                 # Include new requirements for write_to_excel
                 target_params = self.target_frame.get_params()
                 if target_params is None:
@@ -994,18 +978,40 @@ class ReformInputFrame(ttk.Frame):
                 #Make a folder in ./tmp to store Excel outputs 
                 tmp_dir = f"./tmp/{str(uuid.uuid4())}"
                 os.mkdir(tmp_dir)
+                paths = []
 
-                #Write data to files in folder
+                #Get evaporation data for selected & control blends
+                c_comp = [self.main_input.all_solvents_df.loc[name,:] for name in self.control_blend["Name"]]
+                c_c0 = self.control_blend["Volume Fraction"]/sum(self.control_blend["Volume Fraction"])
+                t_span = [0, float(self.total_time.get())]
+                target = self.target_frame.get_params()
+                temp_curve = self.temp_frame.get_temp_profile()
+                c_t, c_total_profile, c_partial_profiles, c_RED = get_evap_curve(c_c0, c_comp, target, temp_curve, t_span, self.main_input.all_solvents_df, replace_by == "Weight Fraction")
+                
                 control_path = f"{tmp_dir}/Control.xlsx"
                 write_to_excel(control_path, self.control_blend["Name"], c_t, c_total_profile, c_partial_profiles, c_RED, temp_curve(c_t),
                                target_params, temp_profile, temp_params, caption=replace_by)
-                alternative_path = f"{tmp_dir}/Alternative ({', '.join(selected_blend)}).xlsx"
-                write_to_excel(alternative_path, selected_blend+list(self.min_comp["Name"]), a_t, a_total_profile, a_partial_profiles, a_RED, temp_curve(a_t),
-                               target_params, temp_profile, temp_params, caption=replace_by)
-
+                paths.append(control_path)
+                
+                for index, selected_blend in enumerate(selected_blends):
+                        a_comp = [self.main_input.all_solvents_df.loc[name,:] for name in selected_blend] + [self.main_input.all_solvents_df.loc[name,:] for name in self.min_comp["Name"]]
+                        if replace_by == "Weight Fraction":
+                                a_wf = np.array(list(selected_concs[index])+list(self.min_comp["Weight Fraction"]))
+                                a_c0 = a_wf * np.array(pd.DataFrame(a_comp)["Density"])
+                                a_c0 /= sum(a_c0)
+                        else:
+                                a_c0 = np.array(list(selected_concs[index])+list(self.min_comp["Volume Fraction"]))
+                        a_t, a_total_profile, a_partial_profiles, a_RED = get_evap_curve(a_c0, a_comp, target, temp_curve, t_span, self.main_input.all_solvents_df, replace_by == "Weight Fraction")
+                        
+                        #alternative_path = f"{tmp_dir}/Alternative ({', '.join(selected_blend)}).xlsx"
+                        alternative_path = f"{tmp_dir}/Alternative {blend_nos[index]}.xlsx"
+                        write_to_excel(alternative_path, selected_blend+list(self.min_comp["Name"]), a_t, a_total_profile, a_partial_profiles, a_RED, temp_curve(a_t),
+                                        target_params, temp_profile, temp_params, caption=replace_by)
+                        paths.append(alternative_path)
+                
                 #Open compare screen with files
                 self.compare_input.clear()
-                self.compare_input.add_files([control_path, alternative_path])
+                self.compare_input.add_files(paths)
                 self.compare_screen.deiconify()
                 
 
@@ -1105,7 +1111,7 @@ class ReformResultsFrame(ttk.Frame):
         
         def compare_to_control(self):
                 try:
-                        self.input_frame.compare_to_control(self.selected_blend, self.selected_conc, self.replace_by)
+                        self.input_frame.compare_to_control(self.selected_blends, self.selected_concs, self.blend_nos, self.replace_by)
                 except TypeError:
                         tk.messagebox.showwarning(title="No Data", message="Please select a blend to compare")
                         self.focus_force()
@@ -1145,18 +1151,31 @@ class ReformResultsFrame(ttk.Frame):
                 """
                 self.compare_button.configure(state="normal")
                 self.export_button.configure(state="normal")
-                cur_id = self.display.selection()[0]
-                cur_item = self.display.set(cur_id)             # cur_item is dictionary of {header: value} for each column in the row
 
-                blend_no = cur_item.pop("Blend")                # Removes blend from cur_item and stores blend number as blend_no
-                cur_cost = cur_item.pop("Cost")                 # Removes cost from cur_item and stores it as cur_cost
-                self.selected_blend = []
-                self.selected_conc = []
+                self.selected_blends = []
+                self.selected_concs = []
+                self.blend_nos = []
+                self.costs = []
+                for cur_id in self.display.selection():
+                        #cur_id = self.display.selection()[0]
+                        cur_item = self.display.set(cur_id)             # cur_item is dictionary of {header: value} for each column in the row
 
-                for item in cur_item.items():
-                        if item[1] != "":
-                                self.selected_blend.append(item[0])
-                                self.selected_conc.append(float(item[1]))
+                        blend_no = cur_item.pop("Blend")                # Removes blend from cur_item and stores blend number as blend_no
+                        cur_cost = cur_item.pop("Cost")                 # Removes cost from cur_item and stores it as cur_cost
+                        selected_blend = []
+                        selected_conc = []
+
+                        for item in cur_item.items():
+                                if item[1] != "":
+                                        selected_blend.append(item[0])
+                                        selected_conc.append(float(item[1]))
+                        self.selected_blends.append(selected_blend)
+                        self.selected_concs.append(selected_conc)
+                        self.blend_nos.append(blend_no)
+                        self.costs.append(cur_cost)
+                
+                self.selected_blend = self.selected_blends[0]   # Still used in export_to_excel
+                self.selected_conc = self.selected_concs[0]
                 
                 #print(f"cur_item: {cur_item}")         # De-bugging to show what update_selection is currently reading
 
