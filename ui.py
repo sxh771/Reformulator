@@ -374,13 +374,14 @@ class MainInputFrame(ttk.Frame):
                         tk.messagebox.showwarning(title="No Formulation", message="Please load or enter a formulation before running the predictor.")
                         return
 
-                try:
+                # Commented out portion below was incorrectly flagging Volume Fraction as a KeyError missing solvent
+                '''try:
                         volume = self.formulation_df["Weight Fraction"] / np.array(self.all_solvents_df["Density"][self.formulation_df["Name"]])
                 except KeyError as e:
                         missing_solvents = str(e).strip("[]'")
                         error_message = f"The following solvents are not in the database: {missing_solvents}"
                         self.show_error_message(error_message)
-                        return  # Exit the method early      
+                        return  # Exit the method early      '''
                   
                 """
                 Processes inputs and sends them to :func:`get_evap_curve`"
@@ -457,7 +458,8 @@ class MainInputFrame(ttk.Frame):
 
                 temp_profile, temp_params = self.temp_frame.get_selected_profile()
 
-                if hasattr(self, 'selected_blend') and self.selected_blend:
+                # The commented out portion below seems useless since write_output is not used in the Reformulation Screen
+                '''if hasattr(self, 'selected_blend') and self.selected_blend:
                         # This is for the Reformulation Tool screen
                         blend = self.selected_blend
                         conc = self.selected_conc
@@ -492,7 +494,18 @@ class MainInputFrame(ttk.Frame):
                         partial_profiles = self.partial_profiles
                         RED = self.RED
                         temp = self.temp
-                        caption = self.formulation_fname
+                        #caption = self.formulation_fname
+                        caption = ""'''
+                
+                # This is for the Evaporation Simulator Comparison Tool screen
+                blend = self.formulation_df["Name"]
+                t = self.t
+                total_profile = self.total_profile
+                partial_profiles = self.partial_profiles
+                RED = self.RED
+                temp = self.temp
+                #caption = self.formulation_fname
+                caption = ""
 
                 target_params['Total Time (min)'] = float(self.total_time.get())
                 target_params['Initial Temperature (C)'] = temp[0]
