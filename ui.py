@@ -616,12 +616,12 @@ class CompareInputFrame(ttk.Frame):
                 for fname in self.files:
                         base = os.path.basename(fname)
                         xl = pd.ExcelFile(fname)
-                        if len(xl.sheet_names) != 2:
-                                tk.messagebox.showwarning(title="Invalid Input", message=f"Bad format - {fname}")
+                        if len(xl.sheet_names) != 3:          # Change this if adding additional Excel sheets to file
+                                tk.messagebox.showwarning(title="Invalid Input", message=f"Bad format (Wrong # of sheets in Excel file) - {fname}")
                                 return
                         if mode == None:
-                                mode = xl.sheet_names[1]
-                        elif xl.sheet_names[1] != mode:
+                                mode = xl.sheet_names[2]
+                        elif xl.sheet_names[2] != mode:         # Checks if sheet name has Weight Fraction or Volume Fraction in it
                                 tk.messagebox.showwarning(title="Invalid Input", message=f"Can't mix weight% and volume% - {fname}")
                                 return
                         df = xl.parse(mode)
@@ -984,6 +984,12 @@ class ReformInputFrame(ttk.Frame):
                 else:
                         a_c0 = np.array(list(selected_conc)+list(self.min_comp["Volume Fraction"]))
                 a_t, a_total_profile, a_partial_profiles, a_RED = get_evap_curve(a_c0, a_comp, target, temp_curve, t_span, self.main_input.all_solvents_df, replace_by == "Weight Fraction")
+
+                # Include new requirements for write_to_excel
+                target_params = self.target_frame.get_params()
+                if target_params is None:
+                        return
+                temp_profile, temp_params = self.temp_frame.get_selected_profile()
                 
                 #Make a folder in ./tmp to store Excel outputs 
                 tmp_dir = f"./tmp/{str(uuid.uuid4())}"
@@ -991,9 +997,11 @@ class ReformInputFrame(ttk.Frame):
 
                 #Write data to files in folder
                 control_path = f"{tmp_dir}/Control.xlsx"
-                write_to_excel(control_path, self.control_blend["Name"], c_t, c_total_profile, c_partial_profiles, c_RED, temp_curve(c_t), caption=replace_by)
+                write_to_excel(control_path, self.control_blend["Name"], c_t, c_total_profile, c_partial_profiles, c_RED, temp_curve(c_t),
+                               target_params, temp_profile, temp_params, caption=replace_by)
                 alternative_path = f"{tmp_dir}/Alternative ({', '.join(selected_blend)}).xlsx"
-                write_to_excel(alternative_path, selected_blend+list(self.min_comp["Name"]), a_t, a_total_profile, a_partial_profiles, a_RED, temp_curve(a_t), caption=replace_by)
+                write_to_excel(alternative_path, selected_blend+list(self.min_comp["Name"]), a_t, a_total_profile, a_partial_profiles, a_RED, temp_curve(a_t),
+                               target_params, temp_profile, temp_params, caption=replace_by)
 
                 #Open compare screen with files
                 self.compare_input.clear()
