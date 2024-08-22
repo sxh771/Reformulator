@@ -616,12 +616,12 @@ class CompareInputFrame(ttk.Frame):
                 for fname in self.files:
                         base = os.path.basename(fname)
                         xl = pd.ExcelFile(fname)
-                        if len(xl.sheet_names) != 3:          # Change this if adding additional Excel sheets to file
-                                tk.messagebox.showwarning(title="Invalid Input", message=f"Bad format (Wrong # of sheets in Excel file) - {fname}")
-                                return
+                        #if len(xl.sheet_names) != 3:          # Change this if adding additional Excel sheets to file
+                                #tk.messagebox.showwarning(title="Invalid Input", message=f"Bad format (Wrong # of sheets in Excel file) - {fname}")
+                                #return
                         if mode == None:
-                                mode = xl.sheet_names[2]
-                        elif xl.sheet_names[2] != mode:         # Checks if sheet name has Weight Fraction or Volume Fraction in it
+                                mode = xl.sheet_names[-1]
+                        elif xl.sheet_names[-1] != mode:         # Checks if sheet name has Weight Fraction or Volume Fraction in it
                                 tk.messagebox.showwarning(title="Invalid Input", message=f"Can't mix weight% and volume% - {fname}")
                                 return
                         df = xl.parse(mode)
@@ -1104,7 +1104,11 @@ class ReformResultsFrame(ttk.Frame):
                 self.input_frame = input_frame
         
         def compare_to_control(self):
-                self.input_frame.compare_to_control(self.selected_blend, self.selected_conc, self.replace_by)
+                try:
+                        self.input_frame.compare_to_control(self.selected_blend, self.selected_conc, self.replace_by)
+                except TypeError:
+                        tk.messagebox.showwarning(title="No Data", message="Please select a blend to compare")
+                        self.focus_force()
 
         def export_output(self):
                 try:

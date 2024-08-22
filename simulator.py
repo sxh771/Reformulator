@@ -422,13 +422,15 @@ def write_to_excel(fname, blend, t, total_profile, partial_profiles, RED, temper
         temp_params: A dictionary containing the parameters of the selected temperature profile
         caption: A string to be used in the "All Data" sheet name
     """
+    if caption != "":
+        caption = f" ({caption})"
     if fname[-5:] != ".xlsx":
         fname = fname + ".xlsx"
     # Ensure at least one sheet is visible
     wb = openpyxl.Workbook()
     wb.create_sheet("Summary")
     wb.create_sheet("Target")
-    wb.create_sheet("All Data")
+    wb.create_sheet(f"All Data{caption}")      # This sheet must be created last, or else the compare function will not work
     wb.save(fname)
 
     with pd.ExcelWriter(fname) as writer:
@@ -457,7 +459,7 @@ def write_to_excel(fname, blend, t, total_profile, partial_profiles, RED, temper
         target_df = pd.DataFrame.from_dict(target_params, orient='index', columns=['Value'])
         target_df.to_excel(writer, sheet_name="Target")
         
-        full_data_df.to_excel(writer, sheet_name=f"All Data")
+        full_data_df.to_excel(writer, sheet_name=f"All Data{caption}")         # This sheet must be created last, or else the compare function will not work
 
     print(f"Excel file saved successfully: {fname}")
 
