@@ -995,13 +995,16 @@ class ReformInputFrame(ttk.Frame):
                         return
                 temp_profile, temp_params = self.temp_frame.get_selected_profile()
                 
-                #Make a folder in ./tmp to store Excel outputs 
+                # Make tmp folder if one is not present
+                if os.path.isdir("./tmp") is False:
+                        os.mkdir("./tmp")
+
+                # Make a unique folder in ./tmp to store Excel outputs 
                 tmp_dir = f"./tmp/{str(uuid.uuid4())}"
-                #tmp_dir = f"./tmp2/{str(uuid.uuid4())}"
                 os.mkdir(tmp_dir)
                 paths = []
 
-                #Get evaporation data for selected & control blends
+                # Get evaporation data for selected & control blends
                 c_comp = [self.main_input.all_solvents_df.loc[name,:] for name in self.control_blend["Name"]]
                 c_c0 = self.control_blend["Volume Fraction"]/sum(self.control_blend["Volume Fraction"])
                 t_span = [0, float(self.total_time.get())]
@@ -1030,7 +1033,7 @@ class ReformInputFrame(ttk.Frame):
                                         target_params, temp_profile, temp_params, caption=replace_by)
                         paths.append(alternative_path)
                 
-                #Open compare screen with files
+                # Open compare screen with files
                 self.compare_input.clear()
                 self.compare_input.add_files(paths)
                 self.compare_screen.deiconify()
