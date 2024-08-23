@@ -626,7 +626,38 @@ class CompareInputFrame(ttk.Frame):
                         del self.file_buttons[fname]
                 self.files = set()
                 self.graph.clear_artists()
-                
+        
+        def delete_tmp(directory="./tmp"):
+                """
+                Deletes tmp directory and closes the program
+                - Removing the tmp directory prevents unnecessary data storage
+                - Does not delete tmp when run from ui.py file. Only deletes tmp when run from .exe file in a folder without ui.py.
+                - Called at the end when program is closed
+                """
+                compare_screen.destroy()        # Destroy screens first to close all open files in program before deletion
+                reform_screen.destroy()
+                root.destroy()
+
+                if os.path.isfile("ui.py") is True:     # Only delete tmp folder if run from the .exe program
+                        print(f"Will not delete directory {directory} when run from Python interpreter")
+                        return
+                if os.path.isdir(directory) is False:
+                        print(f"No directory {directory} to delete")
+                        return
+                try:
+                        for sub_directory in os.listdir(directory):     # Sort through tmp and delete files before folders
+                                sub_directory = directory +"/"+ sub_directory
+                                for file in os.listdir(sub_directory):
+                                        file = sub_directory +"/"+ file
+                                        os.remove(file)
+                                os.rmdir(sub_directory)
+                        os.rmdir(directory)
+                        print(f"Deleted directory: {directory}")
+                except Exception as e:
+                        print(e)
+                        tk.messagebox.showinfo("Deletion unsuccessful", f"Error occured: \n {e}")
+                        root.destroy()
+
         def compare(self):
                 """
                 Generate comparison plot using loaded data and inputs.
@@ -1535,5 +1566,7 @@ if __name__ == "__main__":
     # Configure the root window to allow expansion
     root.columnconfigure(1, weight=1)
     root.rowconfigure(0, weight=1)
+
+    root.protocol("WM_DELETE_WINDOW", CompareInputFrame.delete_tmp)   # Delete all files and folders within tmp directory when run from .exe
     
     root.mainloop()
