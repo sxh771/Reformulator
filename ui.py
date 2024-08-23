@@ -504,7 +504,8 @@ class MainInputFrame(ttk.Frame):
                 RED = self.RED
                 temp = self.temp
                 #caption = self.formulation_fname
-                if "Volume Fraction" not in self.formulation_df.columns:
+                print(f"self.formulation_df.colums: {self.formulation_df.columns}")
+                if "Weight Fraction" in self.formulation_df.columns:
                         caption = "Weight Fraction"
                 else:
                         caption = "Volume Fraction"
@@ -512,8 +513,12 @@ class MainInputFrame(ttk.Frame):
                 target_params['Total Time (min)'] = float(self.total_time.get())
                 target_params['Initial Temperature (C)'] = temp[0]
 
-                write_to_excel(fname, blend, t, total_profile, partial_profiles, RED, temp, 
-                               target_params, temp_profile, temp_params, caption=caption)
+                try:
+                        write_to_excel(fname, blend, t, total_profile, partial_profiles, RED, temp, 
+                                target_params, temp_profile, temp_params, caption=caption)
+                except PermissionError:
+                        tk.messagebox.showwarning(title="Error File Overwrite", message="Could not overwrite file. Try creating a new file name")
+                        return
 
                 # # Open the file using the default application
                 # if sys.platform.startswith('darwin'):  # macOS
@@ -992,6 +997,7 @@ class ReformInputFrame(ttk.Frame):
                 
                 #Make a folder in ./tmp to store Excel outputs 
                 tmp_dir = f"./tmp/{str(uuid.uuid4())}"
+                #tmp_dir = f"./tmp2/{str(uuid.uuid4())}"
                 os.mkdir(tmp_dir)
                 paths = []
 
@@ -1127,8 +1133,8 @@ class ReformResultsFrame(ttk.Frame):
         def compare_to_control(self):
                 try:
                         self.input_frame.compare_to_control(self.selected_blends, self.selected_concs, self.blend_nos, self.replace_by)
-                except TypeError:
-                        tk.messagebox.showwarning(title="No Data", message="Please select a blend to compare")
+                except Exception as e:
+                        tk.messagebox.showwarning(title="No Data", message=f"Error {str(e)}")
                         self.focus_force()
 
         def export_output(self):
