@@ -368,13 +368,15 @@ class MainInputFrame(ttk.Frame):
                 self.reform_input.solvent_label.configure(text=os.path.basename(fname))
 
         def run_evap_predictor(self):
-
+                """
+                Processes inputs and sends them to :func:`get_evap_curve`"
+                """
                 # Check if formulation_df is empty
                 if self.formulation_df.empty:
                         tk.messagebox.showwarning(title="No Formulation", message="Please load or enter a formulation before running the predictor.")
                         return
 
-                # Commented out portion below was incorrectly flagging Volume Fraction as a KeyError missing solvent
+                # Commented out portion below which was incorrectly flagging Volume Fraction as a KeyError missing solvent
                 '''try:
                         volume = self.formulation_df["Weight Fraction"] / np.array(self.all_solvents_df["Density"][self.formulation_df["Name"]])
                 except KeyError as e:
@@ -383,9 +385,6 @@ class MainInputFrame(ttk.Frame):
                         self.show_error_message(error_message)
                         return  # Exit the method early      '''
                   
-                """
-                Processes inputs and sends them to :func:`get_evap_curve`"
-                """
                 if "Volume Fraction" not in self.formulation_df.columns:
                         try:
                                 volume = self.formulation_df["Weight Fraction"] / np.array(self.all_solvents_df["Density"][self.formulation_df["Name"]])
@@ -505,7 +504,10 @@ class MainInputFrame(ttk.Frame):
                 RED = self.RED
                 temp = self.temp
                 #caption = self.formulation_fname
-                caption = ""
+                if "Volume Fraction" not in self.formulation_df.columns:
+                        caption = "Weight Fraction"
+                else:
+                        caption = "Volume Fraction"
 
                 target_params['Total Time (min)'] = float(self.total_time.get())
                 target_params['Initial Temperature (C)'] = temp[0]
@@ -633,7 +635,7 @@ class CompareInputFrame(ttk.Frame):
                                 #tk.messagebox.showwarning(title="Invalid Input", message=f"Bad format (Wrong # of sheets in Excel file) - {fname}")
                                 #return
                         if mode == None:
-                                mode = xl.sheet_names[-1]
+                                mode = xl.sheet_names[-1]        # Last sheet in file must be the "All Data" sheet
                         elif xl.sheet_names[-1] != mode:         # Checks if sheet name has Weight Fraction or Volume Fraction in it
                                 tk.messagebox.showwarning(title="Invalid Input", message=f"Can't mix weight% and volume% - {fname}")
                                 return
