@@ -368,23 +368,23 @@ class MainInputFrame(ttk.Frame):
                 self.reform_input.solvent_label.configure(text=os.path.basename(fname))
 
         def run_evap_predictor(self):
-
+                """
+                Processes inputs and sends them to :func:`get_evap_curve`"
+                """
                 # Check if formulation_df is empty
                 if self.formulation_df.empty:
                         tk.messagebox.showwarning(title="No Formulation", message="Please load or enter a formulation before running the predictor.")
                         return
 
-                try:
+                # Commented out portion below which was incorrectly flagging Volume Fraction as a KeyError missing solvent
+                '''try:
                         volume = self.formulation_df["Weight Fraction"] / np.array(self.all_solvents_df["Density"][self.formulation_df["Name"]])
                 except KeyError as e:
                         missing_solvents = str(e).strip("[]'")
                         error_message = f"The following solvents are not in the database: {missing_solvents}"
                         self.show_error_message(error_message)
-                        return  # Exit the method early      
+                        return  # Exit the method early      '''
                   
-                """
-                Processes inputs and sends them to :func:`get_evap_curve`"
-                """
                 if "Volume Fraction" not in self.formulation_df.columns:
                         try:
                                 volume = self.formulation_df["Weight Fraction"] / np.array(self.all_solvents_df["Density"][self.formulation_df["Name"]])
@@ -457,7 +457,8 @@ class MainInputFrame(ttk.Frame):
 
                 temp_profile, temp_params = self.temp_frame.get_selected_profile()
 
-                if hasattr(self, 'selected_blend') and self.selected_blend:
+                # The commented out portion below seems useless since write_output is not used in the Reformulation Screen
+                '''if hasattr(self, 'selected_blend') and self.selected_blend:
                         # This is for the Reformulation Tool screen
                         blend = self.selected_blend
                         conc = self.selected_conc
@@ -492,13 +493,32 @@ class MainInputFrame(ttk.Frame):
                         partial_profiles = self.partial_profiles
                         RED = self.RED
                         temp = self.temp
-                        caption = self.formulation_fname
+                        #caption = self.formulation_fname
+                        caption = ""'''
+                
+                # This is for the Evaporation Simulator Comparison Tool screen
+                blend = self.formulation_df["Name"]
+                t = self.t
+                total_profile = self.total_profile
+                partial_profiles = self.partial_profiles
+                RED = self.RED
+                temp = self.temp
+                #caption = self.formulation_fname
+                print(f"self.formulation_df.colums: {self.formulation_df.columns}")
+                if "Weight Fraction" in self.formulation_df.columns:
+                        caption = "Weight Fraction"
+                else:
+                        caption = "Volume Fraction"
 
                 target_params['Total Time (min)'] = float(self.total_time.get())
                 target_params['Initial Temperature (C)'] = temp[0]
 
-                write_to_excel(fname, blend, t, total_profile, partial_profiles, RED, temp, 
-                               target_params, temp_profile, temp_params, caption=caption)
+                try:
+                        write_to_excel(fname, blend, t, total_profile, partial_profiles, RED, temp, 
+                                target_params, temp_profile, temp_params, caption=caption)
+                except PermissionError:
+                        tk.messagebox.showwarning(title="Error File Overwrite", message="Could not overwrite file. Try creating a new file name")
+                        return
 
                 # # Open the file using the default application
                 # if sys.platform.startswith('darwin'):  # macOS
@@ -606,7 +626,38 @@ class CompareInputFrame(ttk.Frame):
                         del self.file_buttons[fname]
                 self.files = set()
                 self.graph.clear_artists()
-                
+        
+        def delete_tmp(directory="./tmp"):
+                """
+                Deletes tmp directory and closes the program
+                - Removing the tmp directory prevents unnecessary data storage
+                - Does not delete tmp when run from ui.py file. Only deletes tmp when run from .exe file in a folder without ui.py.
+                - Called at the end when program is closed
+                """
+                compare_screen.destroy()        # Destroy screens first to close all open files in program before deletion
+                reform_screen.destroy()
+                root.destroy()
+
+                if os.path.isfile("ui.py") is True:     # Only delete tmp folder if run from the .exe program
+                        print(f"Will not delete directory {directory} when run from Python interpreter")
+                        return
+                if os.path.isdir(directory) is False:
+                        print(f"No directory {directory} to delete")
+                        return
+                try:
+                        for sub_directory in os.listdir(directory):     # Sort through tmp and delete files before folders
+                                sub_directory = directory +"/"+ sub_directory
+                                for file in os.listdir(sub_directory):
+                                        file = sub_directory +"/"+ file
+                                        os.remove(file)
+                                os.rmdir(sub_directory)
+                        os.rmdir(directory)
+                        print(f"Deleted directory: {directory}")
+                except Exception as e:
+                        print(e)
+                        tk.messagebox.showinfo("Deletion unsuccessful", f"Error occured: \n {e}")
+                        root.destroy()
+
         def compare(self):
                 """
                 Generate comparison plot using loaded data and inputs.
@@ -616,12 +667,12 @@ class CompareInputFrame(ttk.Frame):
                 for fname in self.files:
                         base = os.path.basename(fname)
                         xl = pd.ExcelFile(fname)
-                        if len(xl.sheet_names) != 2:
-                                tk.messagebox.showwarning(title="Invalid Input", message=f"Bad format - {fname}")
-                                return
+                        #if len(xl.sheet_names) != 3:          # Change this if adding additional Excel sheets to file
+                                #tk.messagebox.showwarning(title="Invalid Input", message=f"Bad format (Wrong # of sheets in Excel file) - {fname}")
+                                #return
                         if mode == None:
-                                mode = xl.sheet_names[1]
-                        elif xl.sheet_names[1] != mode:
+                                mode = xl.sheet_names[-1]        # Last sheet in file must be the "All Data" sheet
+                        elif xl.sheet_names[-1] != mode:         # Checks if sheet name has Weight Fraction or Volume Fraction in it
                                 tk.messagebox.showwarning(title="Invalid Input", message=f"Can't mix weight% and volume% - {fname}")
                                 return
                         df = xl.parse(mode)
@@ -712,7 +763,10 @@ class ReformInputFrame(ttk.Frame):
                 ttk.Label(self, text="Total Time (min): ").grid(row=10,column=0)
                 self.total_time = ttk.Entry(self)
                 self.total_time.grid(row=10,column=1)
-                ttk.Button(self, text="Find Solvent Blends", style="big.TButton", command=self.find_blends).grid(row=11, column=0, columnspan=2)
+                ttk.Label(self, text="# Blends to display: ").grid(row=11,column=0)
+                self.num_results = ttk.Entry(self)
+                self.num_results.grid(row=11, column=1)
+                ttk.Button(self, text="Find Solvent Blends", style="big.TButton", command=self.find_blends).grid(row=12, column=0, columnspan=2)
                 self.control_fname = ""
                 self.mc_fname = ""
                 self.wl_bl_fname = ""
@@ -829,9 +883,9 @@ class ReformInputFrame(ttk.Frame):
                 """
                 Gathers inputs, checks them, and then calls :func:`get_alternative_blends`
                 """
-                self.results_frame.clear()
+                self.results_frame.clear()              # Clears the Alternative Blends Treeview Frame
                 try:
-                        min_exempt = int(self.solvent_nums["min_exempt"].get())
+                        min_exempt = int(self.solvent_nums["min_exempt"].get())         # Gathers the number of exempt and non-exempt solvents specified by user
                         max_exempt = int(self.solvent_nums["max_exempt"].get())
                         min_ne = int(self.solvent_nums["min_ne"].get())
                         max_ne = int(self.solvent_nums["max_ne"].get())
@@ -854,8 +908,8 @@ class ReformInputFrame(ttk.Frame):
                         tk.messagebox.showwarning(title="Invalid Input", message=f"Error in max VOC: {str(e)}\nPlease enter a decimal number between 0 and 100 for max VOC.")
                         self.focus_force()
                         return
-                target_params = self.target_frame.get_params()
-                temp_profile = self.temp_frame.get_temp_profile()
+                target_params = self.target_frame.get_params()          # Get Target parameters from user input
+                temp_profile = self.temp_frame.get_temp_profile()       # Get Temperature parameters from user input
                 if target_params is None or temp_profile is None:
                         return
                 if self.main_input.all_solvents_df is None:
@@ -863,7 +917,7 @@ class ReformInputFrame(ttk.Frame):
                         self.focus_force()
                         return
                 if self.using_whitelist:
-                        missing_solvents = []
+                        missing_solvents = []           # missing_solvents tracks what whitelist solvents are not in solvent database for error message
                         for solvent in self.whitelist:
                                 if solvent not in self.main_input.all_solvents_df.index:
                                         missing_solvents.append(str(solvent))
@@ -872,7 +926,7 @@ class ReformInputFrame(ttk.Frame):
                                 self.focus_force()
                                 return
                 elif self.blacklist is not None:
-                        missing_solvents = []
+                        missing_solvents = []           # tracks what blacklist solvents are not in solvent database ## Would this even cause an issue?
                         for solvent in self.blacklist:
                                 if solvent not in self.main_input.all_solvents_df.index:
                                         missing_solvents.append(str(solvent))
@@ -881,8 +935,8 @@ class ReformInputFrame(ttk.Frame):
                                 self.focus_force()
                                 return
 
-                replace_by = "Volume Fraction" if "Volume Fraction" in self.min_comp.columns else "Weight Fraction"
-                missing_solvents = []
+                replace_by = "Volume Fraction" if "Volume Fraction" in self.min_comp.columns else "Weight Fraction"            # Converts betweeen Volume and Weight Fraction
+                missing_solvents = []                   # tracks what min_comp solvents are not in the database
                 for solvent in self.min_comp["Name"]:
                         if solvent not in self.main_input.all_solvents_df.index:
                                 missing_solvents.append(str(solvent))
@@ -897,14 +951,14 @@ class ReformInputFrame(ttk.Frame):
 
                 try:
                         formulation_density = float(self.density_entry.get())
-                        if self.density_units.get() == "g/L":
+                        if self.density_units.get() == "g/L":                   # Convert density from g/L to lb/gal
                                 formulation_density *= 0.0083
                 except ValueError:
                         tk.messagebox.showwarning(title="Invalid Input", message="Please enter a valid decimal number for formulation density (or 0 if unknown).")
                         self.focus_force()
                         return
 
-                control_solvents = pd.DataFrame([self.main_input.all_solvents_df.loc[n,:] for n in self.control_blend["Name"]])
+                control_solvents = pd.DataFrame([self.main_input.all_solvents_df.loc[n,:] for n in self.control_blend["Name"]])         # Gather info for solvents in control
                 try:
                         if "Volume Fraction" not in self.control_blend.columns:
                                 self.control_blend["Volume Fraction"] = self.control_blend["Weight Fraction"] / np.array(control_solvents["Density"])
@@ -933,12 +987,23 @@ class ReformInputFrame(ttk.Frame):
                         self.focus_force()
                         return
                 
+                try:
+                        num_results = int(self.num_results.get())
+                except TypeError:
+                        tk.messagebox.showwarning(title="Invalid Input", message="# Blends in Results must be an integer")
+                except ValueError: 
+                        num_results = 10        # If no value is entered, display 10 results as the default
+                
+                # Does the processing of the reformulator window
                 results = get_alternative_blends(self.main_input.all_solvents_df, self.control_blend, self.min_comp, replace_by, target_params,
-                                                 temp_profile, (min_exempt, max_exempt), (min_ne, max_ne), (max_voc, VOC_limit_type), formulation_density,
+                                                 temp_profile, (min_exempt, max_exempt), (min_ne, max_ne), (max_voc, VOC_limit_type), formulation_density, num_results,
                                                  self.whitelist if self.using_whitelist else None, self.blacklist if not self.using_whitelist else None)
                 
-                groups = group_similar_results(results, (min_exempt+min_ne, max_exempt+max_ne))
-                self.results_frame.make_tree(groups, replace_by)
+                # Cleans up the results of get_alternative_blends
+                # groups = group_similar_results(results, (min_exempt+min_ne, max_exempt+max_ne))
+                self.headers, self.data = group_similar_results_2(results)
+                self.results_frame.make_table(self.headers, self.data, replace_by)
+                #self.results_frame.make_tree(groups, replace_by)        # This is what creates the data in the old display
                 print("Tree created, checking button states")
                 self.results_frame.check_button_states()
                 # self.results_frame.print_tree()
@@ -947,7 +1012,7 @@ class ReformInputFrame(ttk.Frame):
                 self.main_input.select_solvent_file()
                 self.focus_force()
 
-        def compare_to_control(self, selected_blend, selected_conc, replace_by):
+        def compare_to_control(self, selected_blends, selected_concs, blend_nos, replace_by):
                 """
                 Opens the currently selected blend alongside the control blend in the "Compare" window
 
@@ -955,35 +1020,53 @@ class ReformInputFrame(ttk.Frame):
                         selected_conc: Initial concentration of solvents in selected blend (weight %)
                         selected_blend: A list of pandas DataFrame rows containing information about the solvents in the selected blend  
                 """
-                #Get evaporation data for selected & control blends
+                # Include new requirements for write_to_excel
+                target_params = self.target_frame.get_params()
+                if target_params is None:
+                        return
+                temp_profile, temp_params = self.temp_frame.get_selected_profile()
+                
+                # Make tmp folder if one is not present
+                if os.path.isdir("./tmp") is False:
+                        os.mkdir("./tmp")
+
+                # Make a unique folder in ./tmp to store Excel outputs 
+                tmp_dir = f"./tmp/{str(uuid.uuid4())}"
+                os.mkdir(tmp_dir)
+                paths = []
+
+                # Get evaporation data for selected & control blends
                 c_comp = [self.main_input.all_solvents_df.loc[name,:] for name in self.control_blend["Name"]]
                 c_c0 = self.control_blend["Volume Fraction"]/sum(self.control_blend["Volume Fraction"])
                 t_span = [0, float(self.total_time.get())]
                 target = self.target_frame.get_params()
                 temp_curve = self.temp_frame.get_temp_profile()
                 c_t, c_total_profile, c_partial_profiles, c_RED = get_evap_curve(c_c0, c_comp, target, temp_curve, t_span, self.main_input.all_solvents_df, replace_by == "Weight Fraction")
-                a_comp = [self.main_input.all_solvents_df.loc[name,:] for name in selected_blend] + [self.main_input.all_solvents_df.loc[name,:] for name in self.min_comp["Name"]]
-                if replace_by == "Weight Fraction":
-                        a_wf = np.array(list(selected_conc)+list(self.min_comp["Weight Fraction"]))
-                        a_c0 = a_wf * np.array(pd.DataFrame(a_comp)["Density"])
-                        a_c0 /= sum(a_c0)
-                else:
-                        a_c0 = np.array(list(selected_conc)+list(self.min_comp["Volume Fraction"]))
-                a_t, a_total_profile, a_partial_profiles, a_RED = get_evap_curve(a_c0, a_comp, target, temp_curve, t_span, self.main_input.all_solvents_df, replace_by == "Weight Fraction")
                 
-                #Make a folder in ./tmp to store Excel outputs 
-                tmp_dir = f"./tmp/{str(uuid.uuid4())}"
-                os.mkdir(tmp_dir)
-
-                #Write data to files in folder
                 control_path = f"{tmp_dir}/Control.xlsx"
-                write_to_excel(control_path, self.control_blend["Name"], c_t, c_total_profile, c_partial_profiles, c_RED, temp_curve(c_t), caption=replace_by)
-                alternative_path = f"{tmp_dir}/Alternative ({', '.join(selected_blend)}).xlsx"
-                write_to_excel(alternative_path, selected_blend+list(self.min_comp["Name"]), a_t, a_total_profile, a_partial_profiles, a_RED, temp_curve(a_t), caption=replace_by)
-
-                #Open compare screen with files
+                write_to_excel(control_path, self.control_blend["Name"], c_t, c_total_profile, c_partial_profiles, c_RED, temp_curve(c_t),
+                               target_params, temp_profile, temp_params, caption=replace_by)
+                paths.append(control_path)
+                
+                for index, selected_blend in enumerate(selected_blends):
+                        a_comp = [self.main_input.all_solvents_df.loc[name,:] for name in selected_blend] + [self.main_input.all_solvents_df.loc[name,:] for name in self.min_comp["Name"]]
+                        if replace_by == "Weight Fraction":
+                                a_wf = np.array(list(selected_concs[index])+list(self.min_comp["Weight Fraction"]))
+                                a_c0 = a_wf * np.array(pd.DataFrame(a_comp)["Density"])
+                                a_c0 /= sum(a_c0)
+                        else:
+                                a_c0 = np.array(list(selected_concs[index])+list(self.min_comp["Volume Fraction"]))
+                        a_t, a_total_profile, a_partial_profiles, a_RED = get_evap_curve(a_c0, a_comp, target, temp_curve, t_span, self.main_input.all_solvents_df, replace_by == "Weight Fraction")
+                        
+                        #alternative_path = f"{tmp_dir}/Alternative ({', '.join(selected_blend)}).xlsx"
+                        alternative_path = f"{tmp_dir}/Alternative {blend_nos[index]}.xlsx"
+                        write_to_excel(alternative_path, selected_blend+list(self.min_comp["Name"]), a_t, a_total_profile, a_partial_profiles, a_RED, temp_curve(a_t),
+                                        target_params, temp_profile, temp_params, caption=replace_by)
+                        paths.append(alternative_path)
+                
+                # Open compare screen with files
                 self.compare_input.clear()
-                self.compare_input.add_files([control_path, alternative_path])
+                self.compare_input.add_files(paths)
                 self.compare_screen.deiconify()
                 
 
@@ -1058,7 +1141,7 @@ class ReformResultsFrame(ttk.Frame):
         """
         Displays results (found alternative blends) and facilitates exporting data/comparison to control for them.
         """
-        def __init__(self, root):
+        def __init__(self, root):       # __init__ is called when window is first opened. Overwritten by clear() in find_blends
                 super().__init__(root)
                 # self.columnconfigure(0, weight=1)
                 # self.rowconfigure(0, weight=1)
@@ -1066,10 +1149,11 @@ class ReformResultsFrame(ttk.Frame):
                 self.big_style.configure("big.TLabel", font=('Arial',14))
                 self.big_style.configure("big.TButton", font=('Arial',14))
                 ttk.Label(self, text="Alternative Blends", style="big.TLabel").grid(row=0,column=0)
-                self.display = ttk.Treeview(self, show='tree')
+                self.display = ttk.Treeview(self, show='tree')  # Set inital display before table is made
                 self.display.column('#0', width=500)
                 self.display.grid(row=1, column=0)
                 self.display.bind("<<TreeviewSelect>>", self.update_selection)
+                #self.display.tag_configure('shaded', background= 'lightblue')
                 self.export_button = ttk.Button(self, text="Export to Excel", state="disabled", style="big.TButton", command=self.export_output)
                 self.export_button.grid(row=2, column=0)
                 print("Export button created with initial state:", self.export_button.cget("state"))
@@ -1081,7 +1165,11 @@ class ReformResultsFrame(ttk.Frame):
                 self.input_frame = input_frame
         
         def compare_to_control(self):
-                self.input_frame.compare_to_control(self.selected_blend, self.selected_conc, self.replace_by)
+                try:
+                        self.input_frame.compare_to_control(self.selected_blends, self.selected_concs, self.blend_nos, self.replace_by)
+                except Exception as e:
+                        tk.messagebox.showwarning(title="No Data", message=f"Error {str(e)}")
+                        self.focus_force()
 
         def export_output(self):
                 try:
@@ -1107,7 +1195,46 @@ class ReformResultsFrame(ttk.Frame):
                         print("  " * depth + str(key))
                         if isinstance(value, dict):
                                 self._print_tree_helper(value, depth + 1)
+
         def update_selection(self, _):
+                """
+                Updates which blend is currently selected in Alternative Blends table
+                
+                Behavior:
+                - Take the information in the selected row and remove the "Blend" and "Cost" columns
+                - Search through each remaining column and add solvent to selected_blend and concentration to selected_conc if the concentration is not zero
+                """
+                self.compare_button.configure(state="normal")
+                self.export_button.configure(state="normal")
+
+                self.selected_blends = []
+                self.selected_concs = []
+                self.blend_nos = []
+                self.costs = []
+                for cur_id in self.display.selection():
+                        #cur_id = self.display.selection()[0]
+                        cur_item = self.display.set(cur_id)             # cur_item is dictionary of {header: value} for each column in the row
+
+                        blend_no = cur_item.pop("Blend")                # Removes blend from cur_item and stores blend number as blend_no
+                        cur_cost = cur_item.pop("Cost")                 # Removes cost from cur_item and stores it as cur_cost
+                        selected_blend = []
+                        selected_conc = []
+
+                        for item in cur_item.items():
+                                if item[1] != "":
+                                        selected_blend.append(item[0])
+                                        selected_conc.append(float(item[1]))
+                        self.selected_blends.append(selected_blend)
+                        self.selected_concs.append(selected_conc)
+                        self.blend_nos.append(blend_no)
+                        self.costs.append(cur_cost)
+                
+                self.selected_blend = self.selected_blends[0]   # Still used in export_to_excel
+                self.selected_conc = self.selected_concs[0]
+                
+                #print(f"cur_item: {cur_item}")         # De-bugging to show what update_selection is currently reading
+
+        '''def update_selection(self, _):               # Old way of updating selection for branched Treeview
                 """
                 Updates which blend is currently selected.
                 Behavior:
@@ -1140,8 +1267,7 @@ class ReformResultsFrame(ttk.Frame):
                         blend.append(next_key)
                         cur_reference = cur_reference[next_key]
                 self.selected_blend = blend
-                self.selected_conc = cur_reference["result"]["conc"]
- 
+                self.selected_conc = cur_reference["result"]["conc"]'''
                 
         # def update_selection(self, _):
         #         print("Selection update triggered")
@@ -1218,7 +1344,34 @@ class ReformResultsFrame(ttk.Frame):
                 print("Compare button state:", self.compare_button.cget("state"))
                 print("Export button state:", self.export_button.cget("state"))        
 
-        def make_tree(self, grouped_results, replace_by):
+        def make_table(self, header_list, data_list, replace_by):
+                """
+                Adds entries and headers to table from group_similar_results
+                """
+                self.header_list = header_list
+                self.data_list = data_list
+                self.replace_by = replace_by
+                self.compare_button.configure(state="disabled") # Disable buttons while table creation is in progress
+                self.export_button.configure(state="disabled")
+                
+                self.display["columns"] = self.header_list
+
+                for i in range(len(self.data_list)):
+                        if i%2 == 0:
+                                self.display.insert(parent= "", index= tk.END, values= self.data_list[i], tags= 'shaded')
+                        else:
+                                self.display.insert(parent= "", index= tk.END, values= self.data_list[i])
+                
+                for index, item in enumerate(self.header_list):
+                        self.display.heading(item, text= item, anchor= tk.CENTER)
+                        self.display.column(index, anchor= tk.CENTER, width= 60, minwidth= 25)  # width and minwidth change the starting and minimum size of the columns, respectively
+                
+                self.compare_button.configure(state="normal")   # Re-enable buttons after
+                self.export_button.configure(state="normal")
+                
+
+
+        '''def make_tree(self, grouped_results, replace_by):
                 self.grouped_results = grouped_results
                 self.replace_by = replace_by
                 self.compare_button.configure(state="disabled")
@@ -1258,7 +1411,7 @@ class ReformResultsFrame(ttk.Frame):
                         
                         # Enable buttons after creating the tree
                         self.compare_button.configure(state="normal")
-                        self.export_button.configure(state="normal") 
+                        self.export_button.configure(state="normal")''' 
         def enable_buttons(self):
                 print("Manually enabling buttons")
                 self.compare_button.configure(state="normal")
@@ -1273,10 +1426,10 @@ class ReformResultsFrame(ttk.Frame):
                 self.compare_button.configure(state="disabled")
                 self.export_button.configure(state="disabled")
                 self.grouped_results = None
-                self.display = ttk.Treeview(self, show='tree')
-                self.display.column('#0', width=500)
+                self.display = ttk.Treeview(self, show='headings')
                 self.display.grid(row=1, column=0)
                 self.display.bind("<<TreeviewSelect>>", self.update_selection)
+                self.display.tag_configure('shaded', background= 'lightgray')
         
         def force_button_update(self):
                 print("Forcing button update")
@@ -1397,7 +1550,7 @@ if __name__ == "__main__":
 
 # Use grid with sticky option to make frames expand
     reform_input.grid(row=0, column=0, sticky="NSEW")
-    reform_results.grid(row=0, column=1, sticky="NSEW")
+    reform_results.grid(row=0, column=1, sticky="NSEW", padx=50)
 
     reform_results.set_input_frame(reform_input)
     reform_screen.withdraw()
@@ -1413,5 +1566,7 @@ if __name__ == "__main__":
     # Configure the root window to allow expansion
     root.columnconfigure(1, weight=1)
     root.rowconfigure(0, weight=1)
+
+    root.protocol("WM_DELETE_WINDOW", CompareInputFrame.delete_tmp)   # Delete all files and folders within tmp directory when run from .exe
     
     root.mainloop()
